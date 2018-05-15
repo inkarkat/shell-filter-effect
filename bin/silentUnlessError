@@ -9,4 +9,4 @@ cleanup()
 }
 trap 'cleanup' INT TERM EXIT
 
-eval "$@" > "$TMPFILE" 2>&1 || cat "$TMPFILE"
+eval "${@//[${IFS-$' \t\n'}]/\\ }" > "$TMPFILE" 2>&1 || cat "$TMPFILE"
