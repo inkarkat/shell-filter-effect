@@ -1,7 +1,5 @@
 #!/bin/bash
 
-set -e
-
 TMPFILE=$(mktemp --tmpdir "$(basename -- "$0")-XXXXXX" 2>/dev/null || echo "${TEMP:-/tmp}/$(basename -- "$0").$$")
 cleanup()
 {
@@ -9,4 +7,17 @@ cleanup()
 }
 trap 'cleanup' INT TERM EXIT
 
-eval "${@//[${IFS-$' \t\n'}]/\\ }" > "$TMPFILE" 2>&1 || cat "$TMPFILE"
+commandLineEscape()
+{
+    eval "typeset -a result=(\"\${${1:?}[@]}\")"
+    typeset escapeChars="\\${IFS-$' \t\n'}"
+    typeset escapeCharIdx
+    for ((escapeCharIdx = 0; escapeCharIdx < ${#escapeChars}; escapeCharIdx++))
+    do
+	result=("${result[@]//"${escapeChars:$escapeCharIdx:1}"/\\"${escapeChars:$escapeCharIdx:1}"}")
+    done
+    eval "${1}Escaped=(\"\${result[@]}\")"
+}
+typeset -a commandLine=("$@")
+commandLineEscape commandLine
+eval "${commandLineEscaped[@]}" > "$TMPFILE" 2>&1 || cat "$TMPFILE"
