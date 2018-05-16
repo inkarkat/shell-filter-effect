@@ -5,7 +5,7 @@ cleanup()
 {
     rm -f "$TMPFILE" 2>/dev/null
 }
-trap 'cleanup' INT TERM EXIT
+trap 'cleanup' EXIT
 
 commandLineEscape()
 {
@@ -20,4 +20,4 @@ commandLineEscape()
 }
 typeset -a commandLine=("$@")
 commandLineEscape commandLine
-eval "${commandLineEscaped[@]}" > "$TMPFILE" 2>&1 || cat "$TMPFILE"
+(eval "${commandLineEscaped[@]}") > "$TMPFILE" 2>&1 || cat "$TMPFILE"
