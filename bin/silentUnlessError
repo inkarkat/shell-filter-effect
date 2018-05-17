@@ -1,23 +1,52 @@
 #!/bin/bash
 
+printUsage()
+{
+    cat <<HELPTEXT
+Execute COMMAND. If it succeeds, its (normal and error) output is suppressed. In
+case of an unclean exit, the output is printed.
+HELPTEXT
+printf 'Usage: %q %s\n' "$(basename "$1")" '[-c|--command "COMMANDLINE" | [--] SIMPLECOMMAND [...]] [...] [-?|-h|--help]'
+}
+
+isNeedEval=
+typeset -a commands=()
+while [ $# -ne 0 ]
+do
+    case "$1" in
+	--help|-h|-\?)	shift; printUsage "$0"; exit 0;;
+	--command|-c)		shift; commands+=(${commands:+;} "$1"); isNeedEval=t; shift;;
+	--)			shift; break;;
+	*)			break;;
+    esac
+done
+if [ $# -ne 0 ]; then
+    if [ "$isNeedEval" ]; then
+	# Combine --command and SIMPLECOMMAND; need to quote SIMPLECOMMAND to
+	# undo the effects of eval.
+	commands+=(${commands:+;} $(printf '%q ' "$@"))
+    else
+	commands=("$@")
+    fi
+fi
+
 TMPFILE=$(mktemp --tmpdir "$(basename -- "$0")-XXXXXX" 2>/dev/null || echo "${TEMP:-/tmp}/$(basename -- "$0").$$")
 cleanup()
 {
-    rm -f "$TMPFILE" 2>/dev/null
+    rm -f -- "$TMPFILE" 2>/dev/null
 }
 trap 'cleanup' EXIT
 
-commandLineEscape()
-{
-    eval "typeset -a result=(\"\${${1:?}[@]}\")"
-    typeset escapeChars="\\${IFS-$' \t\n'}"
-    typeset escapeCharIdx
-    for ((escapeCharIdx = 0; escapeCharIdx < ${#escapeChars}; escapeCharIdx++))
-    do
-	result=("${result[@]//"${escapeChars:$escapeCharIdx:1}"/\\"${escapeChars:$escapeCharIdx:1}"}")
-    done
-    eval "${1}Escaped=(\"\${result[@]}\")"
-}
-typeset -a commandLine=("$@")
-commandLineEscape commandLine
-(eval "${commandLineEscaped[@]}") > "$TMPFILE" 2>&1 || cat "$TMPFILE"
+if (
+    if [ "$isNeedEval" ]; then
+	eval "${commands[@]}"
+    else
+	"${commands[@]}"
+    fi
+) > "$TMPFILE" 2>&1; then
+    :
+else
+    status=$?
+    cat "$TMPFILE"
+    exit $status
+fi
