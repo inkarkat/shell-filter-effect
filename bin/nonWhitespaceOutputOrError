@@ -1,0 +1,5 @@
+#!/usr/bin/awk -f
+
+{ print; }
+/\S/ { output = 1; }
+END { if (! output) exit 1; }
