@@ -1,0 +1,6 @@
+#!/usr/bin/awk -f
+
+{ print; }
+{ if ($0 != "") output = 1; }
+2 { output = 1; }
+END { if (! output) exit 1; }
