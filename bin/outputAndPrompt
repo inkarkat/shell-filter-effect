@@ -12,13 +12,15 @@ HELPTEXT
     printf 'Usage: cat FILE [...] | %q %s\n' "$(basename "$1")" '[-w|--non-whitespace] [-b|--before] [-t|--timeout TIMEOUT] [PROMPT] [-?|-h|--help]'
 }
 
+isAfter=t
 typeset readArgs=()
 typeset -a forwardedArgs=()
 while [ $# -ne 0 ]
 do
     case "$1" in
 	--help|-h|-\?)	shift; printUsage "$0"; exit 0;;
-	--non-whitespace|-w|--before|-b)	forwardedArgs+=("$1"); shift;;
+	--non-whitespace|-w)	forwardedArgs+=("$1"); shift;;
+	--before|-b)		forwardedArgs+=("$1"); shift; isAfter=;;
 	--timeout|-t)	shift; readArgs+=(-t "$1"); shift;;
 	--)		shift; break;;
 	*)		break;;
@@ -28,7 +30,19 @@ if [ $# -gt 1 ]; then
     printUsage "$0" >&2
     exit 2
 fi
-readArgs+=(-p "${1-Press any key to continue...}")
+promptText="${1-Press any key to continue...}"
+readArgs+=(-p "${isAfter:+$promptText}")
 
-printf -v quotedReadArgs '%q ' "${readArgs[@]}"; quotedReadArgs=${quotedReadArgs% }
-exec outputAnd "${forwardedArgs[@]}" --command "< /dev/tty read -r -s -N 1 $quotedReadArgs; echo"
+
+if [ "$isAfter" ]; then
+    printf -v quotedReadArgs '%q ' "${readArgs[@]}"; quotedReadArgs=${quotedReadArgs% }
+    exec outputAnd "${forwardedArgs[@]}" --command "< /dev/tty read -r -s -N 1 $quotedReadArgs; echo"
+else
+    # Only the prompt itself must be printed before the output, as read would
+    # block and prevent the printing of output. We know whether we need
+    # prompting through the exit status of outputAnd and do that (silently,
+    # without output) afterwards.
+    printf -v quotedPromptText '%q' "$promptText"
+    outputAnd "${forwardedArgs[@]}" --command "printf >&2 %s${promptText:+\\\\n} $quotedPromptText" && \
+	{ < /dev/tty read -r -s -N 1 "${readArgs[@]}"; exit 0; }
+fi
