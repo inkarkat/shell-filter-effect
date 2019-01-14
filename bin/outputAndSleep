@@ -1,0 +1,29 @@
+#!/bin/bash
+
+printUsage()
+{
+    cat <<HELPTEXT
+If there's output (with -w|--non-whitespace: output that does contains at least
+one non-whitespace character), pause for NUMBER seconds.
+If no output is piped into the command, there's no delay, and the exit status is
+1.
+HELPTEXT
+    printf 'Usage: cat FILE [...] | %q %s\n' "$(basename "$1")" '[-w|--non-whitespace] NUMBER[SUFFIX] [...] [-?|-h|--help]'
+}
+
+typeset -a forwardedArgs=()
+while [ $# -ne 0 ]
+do
+    case "$1" in
+	--help|-h|-\?)	shift; printUsage "$0"; exit 0;;
+	--non-whitespace|-w)	forwardedArgs+=("$1"); shift;;
+	--)		shift; break;;
+	*)		break;;
+    esac
+done
+if [ $# -eq 0 ]; then
+    printUsage "$0" >&2
+    exit 2
+fi
+
+exec outputAnd "${forwardedArgs[@]}" -- sleep "$@"
