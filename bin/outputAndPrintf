@@ -4,8 +4,8 @@ printUsage()
 {
     cat <<HELPTEXT
 If there's output (with -w|--non-whitespace: output that does contains at least
-one non-whitespace character), printf FORMAT [ARGUMENTS ...] instead (with
--2|--stderr: to standard error) is printed before (with -a|--append: after) it.
+one non-whitespace character), printf FORMAT [ARGUMENTS ...] (with -2|--stderr:
+to standard error) is printed before (with -a|--append: after) it.
 If no output is piped into the command, nothing is printed, and the exit status
 is 1.
 HELPTEXT
@@ -13,16 +13,15 @@ HELPTEXT
 }
 
 redir=
-tester=outputOrError
-isNonWhitespace=
-isAppend=
+typeset -a beforeArg=(--before)
+typeset -a forwardedArgs=()
 while [ $# -ne 0 ]
 do
     case "$1" in
 	--help|-h|-\?)	shift; printUsage "$0"; exit 0;;
-	--non-whitespace|-w)	shift; isNonWhitespace=t; tester=nonWhitespaceOutputOrError;;
+	--non-whitespace|-w)	forwardedArgs+=("$1"); shift;;
 	--stderr|-2)		shift; redir='>&2';;
-	--append|-a)		shift; isAppend=t;;
+	--append|-a)		shift; beforeArg=();;
 	--)		shift; break;;
 	*)		break;;
     esac
@@ -32,41 +31,5 @@ if [ $# -eq 0 ]; then
     exit 2
 fi
 
-if [ "$isAppend" ]; then
-    eval "$tester && printf $redir" '"$@"'
-else
-    status=1
-    isInputAvailable=t
-
-    if [ "$isNonWhitespace" ]; then
-	lines=
-	while [ "$isInputAvailable" ]
-	do
-	    if ! IFS=$'\n' read -r line; then
-		isInputAvailable=
-		lines="${lines}$line"
-	    else
-		lines="${lines}${line}
-"
-	    fi
-	    if [[ "$lines" =~ [^[:space:]] ]]; then
-		eval "printf $redir" '"$@"'
-		status=0
-		break
-	    fi
-	done
-	printf '%s' "$lines"
-    else
-	IFS=$'\n' read -r line || isInputAvailable=
-	if [ "$line" ]; then
-	    eval "printf $redir" '"$@"'
-	    status=0
-	    printf "%s${isInputAvailable:+\\n}" "$line"
-	fi
-    fi
-
-    if [ "$isInputAvailable" ]; then
-	cat
-    fi
-    exit $status
-fi
+printf -v quotedPrintfArgs '%q ' "$@"; quotedPrintfArgs=${quotedPrintfArgs% }
+exec outputAnd "${beforeArg[@]}" "${forwardedArgs[@]}" --command "printf $redir $quotedPrintfArgs"
