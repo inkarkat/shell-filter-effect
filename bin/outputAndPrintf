@@ -31,5 +31,5 @@ if [ $# -eq 0 ]; then
     exit 2
 fi
 
-printf -v quotedPrintfArgs '%q ' "$@"; quotedPrintfArgs=${quotedPrintfArgs% }
+quotedPrintfArgs=; if [ $# -gt 0 ]; then printf -v quotedPrintfArgs '%q ' "$@"; quotedPrintfArgs=${quotedPrintfArgs% }; fi
 exec outputAnd "${beforeArg[@]}" "${forwardedArgs[@]}" --command "printf $redir $quotedPrintfArgs"
