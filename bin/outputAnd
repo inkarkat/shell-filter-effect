@@ -1,0 +1,96 @@
+#!/bin/bash
+
+printUsage()
+{
+    cat <<HELPTEXT
+If there's output (with -w|--non-whitespace: output that does contains at least
+one non-whitespace character), execute the shell COMMANDS after (with
+-b|--before: before) the output is printed.
+If no output is piped into the command, nothing is executed, and the exit status
+is 1. If COMMANDS fail, the exit status is 125.
+HELPTEXT
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[-w|--non-whitespace] [-b|--before] -c|--command "COMMANDLINE" [-c ...] | [--] SIMPLECOMMAND [...] [-?|-h|--help]'
+}
+
+isNeedEval=
+typeset -a commands=()
+tester=outputOrError
+isNonWhitespace=
+isBefore=
+while [ $# -ne 0 ]
+do
+    case "$1" in
+	--help|-h|-\?)	shift; printUsage "$0"; exit 0;;
+	--non-whitespace|-w)	shift; isNonWhitespace=t; tester=nonWhitespaceOutputOrError;;
+	--before|-b)		shift; isBefore=t;;
+	--command|-c)	shift; commands+=(${commands:+;} "$1"); isNeedEval=t; shift;;
+	--)		shift; break;;
+	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
+	*)		break;;
+    esac
+done
+if [ $# -ne 0 ]; then
+    if [ "$isNeedEval" ]; then
+	# Combine --command and SIMPLECOMMAND; need to quote SIMPLECOMMAND to
+	# undo the effects of eval.
+	commands+=(${commands:+;} $(printf '%q ' "$@"))
+    else
+	commands=("$@")
+    fi
+fi
+if [ ${#commands[@]} -eq 0 ]; then
+    echo >&2 'ERROR: No COMMAND(s) specified; need to pass -c|--command "COMMANDLINE", or SIMPLECOMMAND.'
+    exit 2
+fi
+
+runCommands()
+(
+    if [ "$isNeedEval" ]; then
+	eval "${commands[@]}"
+    else
+	"${commands[@]}"
+    fi
+)
+
+
+status=1
+if [ "$isBefore" ]; then
+    isInputAvailable=t
+
+    if [ "$isNonWhitespace" ]; then
+	lines=
+	while [ "$isInputAvailable" ]
+	do
+	    if ! IFS=$'\n' read -r line; then
+		isInputAvailable=
+		lines="${lines}$line"
+	    else
+		lines="${lines}${line}
+"
+	    fi
+	    if [[ "$lines" =~ [^[:space:]] ]]; then
+		status=0
+		runCommands || status=125
+		break
+	    fi
+	done
+	printf '%s' "$lines"
+    else
+	IFS=$'\n' read -r line || isInputAvailable=
+	if [ "$line" ]; then
+	    status=0
+	    runCommands || status=125
+	    printf "%s${isInputAvailable:+\\n}" "$line"
+	fi
+    fi
+
+    if [ "$isInputAvailable" ]; then
+	cat
+    fi
+else
+    if $tester; then
+	status=0
+	runCommands || status=125
+    fi
+fi
+exit $status
