@@ -1,0 +1,53 @@
+#!/bin/bash
+
+printUsage()
+{
+    cat <<HELPTEXT
+If piping into COMMANDS does not succeed, store the duplicated input into
+SAVE-FILE / a timestamped file in the current directory.
+HELPTEXT
+    printf 'Usage: cat FILE [...] | %q %s\n' "$(basename "$1")" '[-o|--output-file SAVE-FILE|-a|--append-output SAVE-FILE] [--or "ALT-COMMANDLINE" [-o ...]] -c|--command "COMMANDLINE [-c ...] | [--] SIMPLECOMMAND [...] [-?|-h|--help]'
+}
+
+saveFile=
+isAppend=
+commands=
+typeset -a args=()
+typeset -a endArgs=()
+while [ $# -ne 0 ]
+do
+    case "$1" in
+	--help|-h|-\?)	    shift; printUsage "$0"; exit 0;;
+	--output-file|-o)   shift; saveFile="$1"; shift;;
+	--append-output|-a) shift; saveFile="$1"; isAppend=t; shift;;
+	--name|-n)	args+=("$1" "$2"); commands="${commands}${commands:+ ; }$2"; shift; shift;;
+	--command|-c)	args+=("$1" "$2"); commands="${commands}${commands:+ ; }$2"; shift; shift;;
+	--or)		args+=("$1" "$2"); shift; shift;;
+	--)		endArgs+=("$1"); shift; break;;
+	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
+	*)		break;;
+    esac
+done
+if [ $# -ne 0 ]; then
+    printf -v quotedSimpleCommands '%q ' "$@"
+    commands="${commands}${commands:+ ; }${quotedSimpleCommands% }"
+fi
+printf -v quotedCommands '%q' "$commands"
+
+[ -n "$saveFile" ] || saveFile="failedPipe_$(timestamp --short)"
+printf -v quotedSaveFile '%q' "$saveFile"
+
+debugCommand=" && printf >&2 '%scat -- %s | %s\\n' \"\$PS4\" $quotedSaveFile $quotedCommands; exit \$status"
+
+if [ "$isAppend" ]; then
+    skipBytes="$(cat -- "$saveFile" 2>/dev/null | wc -c)"
+    if [ "$skipBytes" ] && [ "$skipBytes" -gt 0 ]; then
+	debugCommand=" && printf >&2 '%stail -c +$((skipBytes + 1)) -- %s | %s\\n' \"\$PS4\" $quotedSaveFile $quotedCommands; exit \$status"
+    fi
+
+    altCommand="cat {} >> ${quotedSaveFile}$debugCommand"
+else
+    altCommand="mv --force -- {} ${quotedSaveFile}$debugCommand"
+fi
+
+exec pipeOr "${args[@]}" --or "$altCommand" "${endArgs[@]}" "$@"
