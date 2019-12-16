@@ -1,0 +1,78 @@
+#!/bin/bash
+set -o pipefail
+
+printUsage()
+{
+    cat <<HELPTEXT
+If piping into COMMANDS does not succeed, pass the duplicated input as a file by
+replacing {} inside ALT-COMMANDS or pipe its contents into ALT-COMMANDS (one
+after the other, until one succeeds) (Or just print it as-is and return the
+original exit status, if none is specified.)
+HELPTEXT
+    printf 'Usage: cat FILE [...] | %q %s\n' "$(basename "$1")" '[-o|--or "ALT-COMMANDLINE" [-o ...]] -c|--command "COMMANDLINE [-c ...] | [--] SIMPLECOMMAND [...] [-?|-h|--help]'
+    printf 'Usage: cat FILE [...] | BREAKPIPE=1|t|true|NAME[,NAME2] %q %s\n' "$(basename "$1")" '-n|--name NAME [-o|--or "ALT-COMMANDLINE" [-o ...]] -c|--command "COMMANDLINE [-c ...] | [--] SIMPLECOMMAND [...] [-?|-h|--help]'
+}
+
+name=
+isNeedEval=
+typeset -a commands=()
+typeset -a altCommands=()
+while [ $# -ne 0 ]
+do
+    case "$1" in
+	--help|-h|-\?)	shift; printUsage "$0"; exit 0;;
+	--name|-n)	shift; name="$1"; shift;;
+	--command|-c)	shift; commands+=(${commands:+;} "$1"); isNeedEval=t; shift;;
+	--or|-o)	shift; altCommands+=("$1"); shift;;
+	--)		shift; break;;
+	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
+	*)		break;;
+    esac
+done
+if [ $# -ne 0 ]; then
+    if [ "$isNeedEval" ]; then
+	# Combine --command and SIMPLECOMMAND; need to quote SIMPLECOMMAND to
+	# undo the effects of eval.
+	commands+=(${commands:+;} $(printf '%q ' "$@"))
+    else
+	commands=("$@")
+    fi
+fi
+if [ ${#commands[@]} -eq 0 ]; then
+    echo >&2 'ERROR: No COMMAND(s) specified; need to pass -c|--command "COMMANDLINE", or SIMPLECOMMAND.'
+    exit 2
+fi
+
+isBreakPipe()
+{
+    case "${BREAKPIPE:-}" in 1|t|true) return 0;; esac
+    [ "$name" ] && case ",${BREAKPIPE:-}," in *,${name},*) return 0;; esac
+    return 1
+}
+isBreakPipe && exec cat
+
+TMPFILE="$(mktemp --tmpdir "$(basename -- "$0")-XXXXXX" 2>/dev/null || echo "${TEMP:-/tmp}/$(basename -- "$0").$$$RANDOM")"
+printf -v quotedTMPFILE '%q' "$TMPFILE"
+[ "${DEBUG:-}" ] || trap 'rm -f "$TMPFILE" 2>/dev/null' EXIT
+
+tee "$TMPFILE" | if [ "$isNeedEval" ]; then
+    eval "${commands[@]}"
+else
+    "${commands[@]}"
+fi && exit
+
+status=$?
+if [ ${#altCommands[@]} -eq 0 ]; then
+    cat -- "$TMPFILE"
+    exit $status
+else
+    for altCommand in "${altCommands[@]}"
+    do
+	interpolatedAltCommand="${altCommand//\{\}/$quotedTMPFILE}"
+	if [ "$interpolatedAltCommand" = "$altCommand" ]; then
+	    cat -- "$TMPFILE" | eval "$altCommand" && break
+	else
+	    eval "$interpolatedAltCommand" && break
+	fi
+    done
+fi
