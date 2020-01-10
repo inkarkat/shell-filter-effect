@@ -81,6 +81,15 @@ do
 			fi
 			mode=append
 			;;
+	--piped|-p)	shift
+			if [ "$mode" ]; then
+			    echo >&2 "ERROR: Cannot combine --piped with --${mode}."
+			    echo >&2
+			    printShortUsage "$0" >&2
+			    exit 2
+			fi
+			mode=piped
+			;;
 	--command|-c)	shift; commands+=(${commands:+;} "$1"); isNeedEval=t; shift;;
 	--skip|-s)	shift; skipPattern="${skipPattern}${skipPattern:+|}${1:?}"; shift;;
 	--)		shift; break;;
@@ -117,24 +126,24 @@ SECONDS=0
 while IFS=$'\n' read -r line || { EOL=; [ -n "$line" ]; }
 do
     if [ "$skipPattern" ] && [[ "$line" =~ $skipPattern ]]; then
-	printf "%s$EOL" "$line"
+	printf %s "${line}$EOL"
 	continue
     fi
     if [ $SECONDS -lt $interval ]; then
-	printf "%s$EOL" "$line"
+	printf %s "${line}$EOL"
 	continue
     fi
 
     if [ ! "$isNonWhitespace" ] || [[ "$line" =~ [^[:space:]] ]]; then
 	case "$mode" in
-	    after)  printf "%s$EOL" "$line";;
-	    append) printf "%s" "$line";;
+	    after)  printf %s "${line}$EOL";;
+	    append) printf %s "$line";;
 	esac
 
 	runCommands || exit $?
 
 	case "$mode" in
-	    before) printf "%s$EOL" "$line";;
+	    before) printf %s "${line}$EOL";;
 	esac
 
 	SECONDS=0
