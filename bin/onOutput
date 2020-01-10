@@ -1,0 +1,127 @@
+#!/bin/bash
+shopt -qs extglob
+
+printShortUsage()
+{
+    # Note: short followed by long option; if the user knows the short one, she can
+    # skim the long one.
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[-i|--interval INTERVAL[SUFFIX]] [-w|--non-whitespace] [-b|--before|-a|--append] [-s|--skip PATTERN [...] -c|--command "COMMANDLINE" [-c ...] | [--] SIMPLECOMMAND [...] [-?|-h|--help]'
+}
+printUsage()
+{
+    # This is the short help when launched with no or incorrect arguments.
+    # It is printed to stderr to avoid accidental processing.
+    printShortUsage "$1" >&2
+    printf >&2 'Try %q --help for more information.\n' "$(basename "$1")"
+}
+printLongUsage()
+{
+    # This is the long "man page" when launched with the help argument.
+    # It is printed to stdout to allow paging with 'more'.
+    cat <<HELPDESCRIPTION
+Whenever there is output (but at least INTERVAL (default: 1 second) apart),
+execute the shell COMMANDS. If these fail, further processing is aborted.
+HELPDESCRIPTION
+    echo
+    printShortUsage "$1"
+    cat <<HELPTEXT
+    --interval|-i INTERVAL[SUFFIX]
+			    Wait for INTERVAL seconds between executions of
+			    COMMAND, even if there's continuous output. SUFFIX
+			    may be 's' for seconds (the default), 'm' for
+			    minutes, 'h' for hours or 'd' for days.
+    --non-whitespace|-w	    Only output that does contains at least one
+			    non-whitespace character triggers COMMAND execution.
+    --before|-b		    Execute COMMAND before the output is printed
+			    (instead of after it).
+    --append|-a		    Execute COMMAND after the output, but instead of a
+			    concluding newline (so any line break has to come
+			    from COMMAND itself).
+    --skip|-s PATTERN	    Ignore (but still print) lines that match PATTERN,
+			    so that these don't trigger COMMAND execution.
+HELPTEXT
+}
+
+interval=1
+isNeedEval=
+typeset -a commands=()
+isNonWhitespace=
+isBefore=
+isAppend=
+skipPattern=
+while [ $# -ne 0 ]
+do
+    case "$1" in
+	--help|-h|-\?)	shift; printUsage "$0"; exit 0;;
+	--interval|-i)	shift
+			case "$1" in
+			    +([0-9])?(s))   interval="${1%s}";;
+			    +([0-9])m)	    interval=$((${1%m} * 60));;
+			    +([0-9])h)	    interval=$((${1%h} * 3600));;
+			    +([0-9])d)	    interval=$((${1%d} * 86400));;
+			    *)		    printf >&2 'ERROR: Illegal interval: %s\n' "$1"; exit 2;;
+			esac
+			shift
+			;;
+	--non-whitespace|-w)	shift; isNonWhitespace=t;;
+	--before|-b)		shift; isBefore=t;;
+	--append|-a)	shift; isAppend=t;;
+	--command|-c)	shift; commands+=(${commands:+;} "$1"); isNeedEval=t; shift;;
+	--skip|-s)	shift; skipPattern="${skipPattern}${skipPattern:+|}${1:?}"; shift;;
+	--)		shift; break;;
+	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
+	*)		break;;
+    esac
+done
+if [ $# -ne 0 ]; then
+    if [ "$isNeedEval" ]; then
+	# Combine --command and SIMPLECOMMAND; need to quote SIMPLECOMMAND to
+	# undo the effects of eval.
+	commands+=(${commands:+;} $(printf '%q ' "$@"))
+    else
+	commands=("$@")
+    fi
+fi
+if [ ${#commands[@]} -eq 0 ]; then
+    echo >&2 'ERROR: No COMMAND(s) specified; need to pass -c|--command "COMMANDLINE", or SIMPLECOMMAND.'
+    exit 2
+elif [ "$isBefore" ] && [ "$isAppend" ]; then
+    echo >&2 'ERROR: Cannot combine --before with --append.'
+    echo >&2
+    printShortUsage "$0" >&2
+    exit 2
+fi
+
+runCommands()
+(
+    if [ "$isNeedEval" ]; then
+	eval "${commands[@]}"
+    else
+	"${commands[@]}"
+    fi
+)
+
+EOL=$'\n'
+SECONDS=0
+while IFS=$'\n' read -r line || { EOL=; [ -n "$line" ]; }
+do
+    if [ "$skipPattern" ] && [[ "$line" =~ $skipPattern ]]; then
+	printf "%s$EOL" "$line"
+	continue
+    fi
+    if [ $SECONDS -lt $interval ]; then
+	printf "%s$EOL" "$line"
+	continue
+    fi
+
+    if [ ! "$isNonWhitespace" ] || [[ "$line" =~ [^[:space:]] ]]; then
+	[ ! "$isBefore" ] && [ ! "$isAppend" ] && printf "%s$EOL" "$line"
+	[ "$isAppend" ] && printf "%s" "$line"
+
+	runCommands || exit $?
+
+	[ "$isBefore" ] && printf "%s$EOL" "$line"
+
+	SECONDS=0
+    fi
+done
