@@ -46,8 +46,7 @@ interval=1
 isNeedEval=
 typeset -a commands=()
 isNonWhitespace=
-isBefore=
-isAppend=
+mode=
 skipPattern=
 while [ $# -ne 0 ]
 do
@@ -64,8 +63,24 @@ do
 			shift
 			;;
 	--non-whitespace|-w)	shift; isNonWhitespace=t;;
-	--before|-b)		shift; isBefore=t;;
-	--append|-a)	shift; isAppend=t;;
+	--before|-b)	shift
+			if [ "$mode" ]; then
+			    echo >&2 "ERROR: Cannot combine --before with --${mode}."
+			    echo >&2
+			    printShortUsage "$0" >&2
+			    exit 2
+			fi
+			mode=before
+			;;
+	--append|-a)	shift
+			if [ "$mode" ]; then
+			    echo >&2 "ERROR: Cannot combine --append with --${mode}."
+			    echo >&2
+			    printShortUsage "$0" >&2
+			    exit 2
+			fi
+			mode=append
+			;;
 	--command|-c)	shift; commands+=(${commands:+;} "$1"); isNeedEval=t; shift;;
 	--skip|-s)	shift; skipPattern="${skipPattern}${skipPattern:+|}${1:?}"; shift;;
 	--)		shift; break;;
@@ -73,6 +88,7 @@ do
 	*)		break;;
     esac
 done
+: ${mode:=after}
 if [ $# -ne 0 ]; then
     if [ "$isNeedEval" ]; then
 	# Combine --command and SIMPLECOMMAND; need to quote SIMPLECOMMAND to
@@ -84,11 +100,6 @@ if [ $# -ne 0 ]; then
 fi
 if [ ${#commands[@]} -eq 0 ]; then
     echo >&2 'ERROR: No COMMAND(s) specified; need to pass -c|--command "COMMANDLINE", or SIMPLECOMMAND.'
-    exit 2
-elif [ "$isBefore" ] && [ "$isAppend" ]; then
-    echo >&2 'ERROR: Cannot combine --before with --append.'
-    echo >&2
-    printShortUsage "$0" >&2
     exit 2
 fi
 
@@ -115,12 +126,16 @@ do
     fi
 
     if [ ! "$isNonWhitespace" ] || [[ "$line" =~ [^[:space:]] ]]; then
-	[ ! "$isBefore" ] && [ ! "$isAppend" ] && printf "%s$EOL" "$line"
-	[ "$isAppend" ] && printf "%s" "$line"
+	case "$mode" in
+	    after)  printf "%s$EOL" "$line";;
+	    append) printf "%s" "$line";;
+	esac
 
 	runCommands || exit $?
 
-	[ "$isBefore" ] && printf "%s$EOL" "$line"
+	case "$mode" in
+	    before) printf "%s$EOL" "$line";;
+	esac
 
 	SECONDS=0
     fi
