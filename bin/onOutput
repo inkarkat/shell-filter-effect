@@ -5,7 +5,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: %q %s\n' "$(basename "$1")" '[-i|--interval INTERVAL[SUFFIX]] [-w|--non-whitespace] [-b|--before|-a|--append] [-s|--skip PATTERN [...] -c|--command "COMMANDLINE" [-c ...] | [--] SIMPLECOMMAND [...] [-?|-h|--help]'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[-i|--interval INTERVAL[SUFFIX]] [-w|--non-whitespace] [-b|--before|-a|--append|-p|--piped] [-s|--skip PATTERN [...] -c|--command "COMMANDLINE" [-c ...] | [--] SIMPLECOMMAND [...] [-?|-h|--help]'
 }
 printUsage()
 {
@@ -27,18 +27,22 @@ HELPDESCRIPTION
     cat <<HELPTEXT
     --interval|-i INTERVAL[SUFFIX]
 			    Wait for INTERVAL seconds between executions of
-			    COMMAND, even if there's continuous output. SUFFIX
+			    COMMANDS, even if there's continuous output. SUFFIX
 			    may be 's' for seconds (the default), 'm' for
 			    minutes, 'h' for hours or 'd' for days.
     --non-whitespace|-w	    Only output that does contains at least one
-			    non-whitespace character triggers COMMAND execution.
-    --before|-b		    Execute COMMAND before the output is printed
+			    non-whitespace character triggers COMMANDS
+			    execution.
+    --before|-b		    Execute COMMANDS before the output is printed
 			    (instead of after it).
-    --append|-a		    Execute COMMAND after the output, but instead of a
+    --append|-a		    Execute COMMANDS after the output, but instead of a
 			    concluding newline (so any line break has to come
-			    from COMMAND itself).
+			    from COMMANDS itself).
+    --piped|-p		    Feed the output since the last invocation of
+			    COMMANDS or the last encountered skipped line to
+			    COMMANDS (which have to do any output themselves).
     --skip|-s PATTERN	    Ignore (but still print) lines that match PATTERN,
-			    so that these don't trigger COMMAND execution.
+			    so that these don't trigger COMMANDS execution.
 HELPTEXT
 }
 
@@ -48,6 +52,7 @@ typeset -a commands=()
 isNonWhitespace=
 mode=
 skipPattern=
+process=print
 while [ $# -ne 0 ]
 do
     case "$1" in
@@ -89,6 +94,7 @@ do
 			    exit 2
 			fi
 			mode=piped
+			process=gather
 			;;
 	--command|-c)	shift; commands+=(${commands:+;} "$1"); isNeedEval=t; shift;;
 	--skip|-s)	shift; skipPattern="${skipPattern}${skipPattern:+|}${1:?}"; shift;;
@@ -112,6 +118,14 @@ if [ ${#commands[@]} -eq 0 ]; then
     exit 2
 fi
 
+print()
+{
+    printf %s "$@"
+}
+gather()
+{
+    collectedLines="${collectedLines}$*"
+}
 runCommands()
 (
     if [ "$isNeedEval" ]; then
@@ -121,31 +135,46 @@ runCommands()
     fi
 )
 
+collectedLines=
 EOL=$'\n'
 SECONDS=0
 while IFS=$'\n' read -r line || { EOL=; [ -n "$line" ]; }
 do
     if [ "$skipPattern" ] && [[ "$line" =~ $skipPattern ]]; then
+	if [ "$collectedLines" ]; then
+	    printf %s "$collectedLines" | runCommands || exit $?
+	    collectedLines=''
+	    SECONDS=0
+	fi
+
 	printf %s "${line}$EOL"
 	continue
     fi
     if [ $SECONDS -lt $interval ]; then
-	printf %s "${line}$EOL"
+	$process "${line}$EOL"
 	continue
     fi
 
     if [ ! "$isNonWhitespace" ] || [[ "$line" =~ [^[:space:]] ]]; then
 	case "$mode" in
-	    after)  printf %s "${line}$EOL";;
-	    append) printf %s "$line";;
+	    after)  $process "${line}$EOL";;
+	    append) $process "$line";;
 	esac
 
-	runCommands || exit $?
+	case "$mode" in
+	    piped)  printf %s "$collectedLines" "${line}$EOL" | runCommands || exit $?
+		    collectedLines=''
+		    ;;
+	    *)	    runCommands || exit $?;;
+	esac
 
 	case "$mode" in
-	    before) printf %s "${line}$EOL";;
+	    before) $process "${line}$EOL";;
 	esac
 
 	SECONDS=0
     fi
 done
+if [ "$collectedLines" ]; then
+    printf %s "$collectedLines" | runCommands || exit $?
+fi
