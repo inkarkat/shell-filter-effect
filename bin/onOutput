@@ -5,7 +5,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: %q %s\n' "$(basename "$1")" '[-i|--interval INTERVAL[SUFFIX]] [-l|--line-interval LINE-NUM] [-w|--non-whitespace] [-b|--before|-a|--append|-p|--piped] [-s|--skip PATTERN [...] -c|--command "COMMANDLINE" [-c ...] | [--] SIMPLECOMMAND [...] [-?|-h|--help]'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[-i|--interval INTERVAL[SUFFIX]] [-l|--line-interval LINE-NUM] [-w|--non-whitespace] [-b|--before|-a|--append|-p|--piped] [-s|--skip PATTERN [...]] [-m|--match PATTERN [...]] -c|--command "COMMANDLINE" [-c ...] | [--] SIMPLECOMMAND [...] [-?|-h|--help]'
 }
 printUsage()
 {
@@ -48,6 +48,9 @@ HELPDESCRIPTION
 			    COMMANDS (which have to do any output themselves).
     --skip|-s PATTERN	    Ignore (but still print) lines that match PATTERN,
 			    so that these don't trigger COMMANDS execution.
+    --match|-m PATTERN	    Only consider lines that match PATTERN for
+			    triggering COMMANDS execution; other lines (and
+			    those that also match --skip PATTERN) are ignored.
 HELPTEXT
 }
 
@@ -58,6 +61,7 @@ typeset -a commands=()
 isNonWhitespace=
 mode=
 skipPattern=
+matchPattern=
 process=print
 while [ $# -ne 0 ]
 do
@@ -105,6 +109,7 @@ do
 			;;
 	--command|-c)	shift; commands+=(${commands:+;} "$1"); isNeedEval=t; shift;;
 	--skip|-s)	shift; skipPattern="${skipPattern}${skipPattern:+|}${1:?}"; shift;;
+	--match|-m)	shift; matchPattern="${matchPattern}${matchPattern:+|}${1:?}"; shift;;
 	--)		shift; break;;
 	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
 	*)		break;;
@@ -148,7 +153,10 @@ SECONDS=0
 lineCnt=0
 while IFS=$'\n' read -r line || { EOL=; [ -n "$line" ]; }
 do
-    if [ "$skipPattern" ] && [[ "$line" =~ $skipPattern ]]; then
+    isSkipThisLine=
+    [ "$matchPattern" ] && [[ ! "$line" =~ $matchPattern ]] && isSkipThisLine=t
+    [ "$skipPattern" ] && [[ "$line" =~ $skipPattern ]] && isSkipThisLine=t
+    if [ "$isSkipThisLine" ]; then
 	if [ "$collectedLines" ]; then
 	    printf %s "$collectedLines" | runCommands || exit $?
 	    collectedLines=''
@@ -159,8 +167,9 @@ do
 	printf %s "${line}$EOL"
 	continue
     fi
+
     let lineCnt+=1
-    if [ $interval -eq 1 -o  $SECONDS -lt $interval ] && { [ ! "$lineInterval" ] || [ $lineCnt -lt $lineInterval ]; }; then
+    if [ $SECONDS -lt $interval ] && { [ ! "$lineInterval" ] || [ $lineCnt -lt $lineInterval ]; }; then
 	$process "${line}$EOL"
 	continue
     fi
