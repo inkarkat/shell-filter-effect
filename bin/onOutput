@@ -5,7 +5,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: %q %s\n' "$(basename "$1")" '[-i|--interval INTERVAL[SUFFIX]] [-w|--non-whitespace] [-b|--before|-a|--append|-p|--piped] [-s|--skip PATTERN [...] -c|--command "COMMANDLINE" [-c ...] | [--] SIMPLECOMMAND [...] [-?|-h|--help]'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[-i|--interval INTERVAL[SUFFIX]] [-l|--line-interval LINE-NUM] [-w|--non-whitespace] [-b|--before|-a|--append|-p|--piped] [-s|--skip PATTERN [...] -c|--command "COMMANDLINE" [-c ...] | [--] SIMPLECOMMAND [...] [-?|-h|--help]'
 }
 printUsage()
 {
@@ -19,8 +19,9 @@ printLongUsage()
     # This is the long "man page" when launched with the help argument.
     # It is printed to stdout to allow paging with 'more'.
     cat <<HELPDESCRIPTION
-Whenever there is output (but at least INTERVAL (default: 1 second) apart),
-execute the shell COMMANDS. If these fail, further processing is aborted.
+Whenever there is output (but at least INTERVAL (default: 1 second) or LINE-NUM
+apart), execute the shell COMMANDS. If these fail, further processing is
+aborted.
 HELPDESCRIPTION
     echo
     printShortUsage "$1"
@@ -30,6 +31,10 @@ HELPDESCRIPTION
 			    COMMANDS, even if there's continuous output. SUFFIX
 			    may be 's' for seconds (the default), 'm' for
 			    minutes, 'h' for hours or 'd' for days.
+    --line-interval|-l LINE-NUM
+			    Wait until LINE-NUM lines have been output before
+			    doing another execution of COMMANDS. If INTERVAL is
+			    also given, one or the other has to be met.
     --non-whitespace|-w	    Only output that does contains at least one
 			    non-whitespace character triggers COMMANDS
 			    execution.
@@ -47,6 +52,7 @@ HELPTEXT
 }
 
 interval=1
+lineInterval=
 isNeedEval=
 typeset -a commands=()
 isNonWhitespace=
@@ -67,6 +73,7 @@ do
 			esac
 			shift
 			;;
+	--line-interval|-l)	shift; lineInterval="${1:?}"; shift;;
 	--non-whitespace|-w)	shift; isNonWhitespace=t;;
 	--before|-b)	shift
 			if [ "$mode" ]; then
@@ -138,6 +145,7 @@ runCommands()
 collectedLines=
 EOL=$'\n'
 SECONDS=0
+lineCnt=0
 while IFS=$'\n' read -r line || { EOL=; [ -n "$line" ]; }
 do
     if [ "$skipPattern" ] && [[ "$line" =~ $skipPattern ]]; then
@@ -145,12 +153,14 @@ do
 	    printf %s "$collectedLines" | runCommands || exit $?
 	    collectedLines=''
 	    SECONDS=0
+	    lineCnt=0
 	fi
 
 	printf %s "${line}$EOL"
 	continue
     fi
-    if [ $SECONDS -lt $interval ]; then
+    let lineCnt+=1
+    if [ $interval -eq 1 -o  $SECONDS -lt $interval ] && { [ ! "$lineInterval" ] || [ $lineCnt -lt $lineInterval ]; }; then
 	$process "${line}$EOL"
 	continue
     fi
@@ -173,6 +183,7 @@ do
 	esac
 
 	SECONDS=0
+	lineCnt=0
     fi
 done
 if [ "$collectedLines" ]; then
