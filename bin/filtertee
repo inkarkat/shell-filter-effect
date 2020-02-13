@@ -1,0 +1,91 @@
+#!/bin/bash
+shopt -qs extglob
+
+printShortUsage()
+{
+    # Note: short followed by long option; if the user knows the short one, she can
+    # skim the long one.
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[-w|--non-whitespace] [-s|--skip PATTERN [...]] [-m|--match PATTERN [...]] [-a|--append] [--] FILE [...] [-?|-h|--help]'
+}
+printUsage()
+{
+    # This is the short help when launched with no or incorrect arguments.
+    # It is printed to stderr to avoid accidental processing.
+    printShortUsage "$1" >&2
+    printf >&2 'Try %q --help for more information.\n' "$(basename "$1")"
+}
+printLongUsage()
+{
+    # This is the long "man page" when launched with the help argument.
+    # It is printed to stdout to allow paging with 'more'.
+    cat <<HELPDESCRIPTION
+Read from standard input and write everything to standard output and selected
+lines to FILEs.
+HELPDESCRIPTION
+    echo
+    printShortUsage "$1"
+    cat <<HELPTEXT
+    --non-whitespace|-w	    Only output that does contains at least one
+			    non-whitespace character is written to FILE.
+    --skip|-s PATTERN	    Ignore (but still print) lines that match PATTERN
+			    when writing to FILE.
+    --match|-m PATTERN	    Only consider lines that match PATTERN when writing
+			    to FILE; other lines (and those that also match
+			    --skip PATTERN) are ignored (but still printed).
+HELPTEXT
+}
+
+isNonWhitespace=
+skipPattern=
+matchPattern=
+redirect='>'
+while [ $# -ne 0 ]
+do
+    case "$1" in
+	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
+	--non-whitespace|-w)	shift; isNonWhitespace=t;;
+	--skip|-s)	shift; skipPattern="${skipPattern}${skipPattern:+|}${1:?}"; shift;;
+	--match|-m)	shift; matchPattern="${matchPattern}${matchPattern:+|}${1:?}"; shift;;
+	--append|-a)	shift; redirect='>>';;
+	--)		shift; break;;
+	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
+	*)		break;;
+    esac
+done
+if [ $# -eq 0 ]; then
+    echo >&2 'ERROR: No FILE passed.'
+    echo >&2
+    printShortUsage "$0" >&2
+    exit 2
+fi
+
+status=0
+# Try to truncate / open for writing all passed FILEs at the beginning; this is
+# how tee works, too. We can sift out problematic files already here.
+typeset -a filespecs=()
+for file
+do
+    eval "$redirect" '"$file"' && filespecs+=("$file") || status=1
+done
+
+EOL=$'\n'
+while IFS=$'\n' read -r line || { EOL=; [ -n "$line" ]; }
+do
+    printf %s "${line}$EOL"
+
+    isSkipThisLine=
+    [ "$isNonWhitespace" ] && [[ ! "$line" =~ [^[:space:]] ]] && isSkipThisLine=t
+    [ "$matchPattern" ] && [[ ! "$line" =~ $matchPattern ]] && isSkipThisLine=t
+    [ "$skipPattern" ] && [[ "$line" =~ $skipPattern ]] && isSkipThisLine=t
+    if [ ! "$isSkipThisLine" ]; then
+	for ((i = 0; i < ${#filespecs[@]}; i++))
+	do
+	    [ "${filespecs[$i]}" ] || continue
+	    if ! printf %s "${line}$EOL" >> "${filespecs[$i]}"; then
+		filespecs[$i]=''  # Remove a problematic file from the roster; this is different from tee's behavior which keeps open a file handle and therefore isn't affected by chmod or removal after the fact.
+		status=1
+	    fi
+	done
+    fi
+done
+exit $status
