@@ -5,15 +5,16 @@ printUsage()
     cat <<HELPTEXT
 If there's output (with -w|--non-whitespace: output that does contains at least
 one non-whitespace character), execute the shell COMMANDS after (with
--b|--before: before) the output is printed.
+-b|--before: before) the output is printed. (Else, execute NOOUT-COMMANDLINE.)
 If no output is piped into the command, nothing is executed, and the exit status
 is 1. If COMMANDS fail, the exit status is 125.
 HELPTEXT
-    printf 'Usage: cat FILE [...] | %q %s\n' "$(basename "$1")" '[-w|--non-whitespace] [-b|--before] -c|--command "COMMANDLINE" [-c ...] | [--] SIMPLECOMMAND [...] [-?|-h|--help]'
+    printf 'Usage: cat FILE [...] | %q %s\n' "$(basename "$1")" '[-w|--non-whitespace] [-b|--before] [-o|--or "NOOUT-COMMANDLINE" [...]] -c|--command "COMMANDLINE" [-c ...] | [--] SIMPLECOMMAND [...] [-?|-h|--help]'
 }
 
 isNeedEval=
 typeset -a commands=()
+typeset -a noOutputCommands=()
 tester=outputOrError
 isNonWhitespace=
 isBefore=
@@ -23,6 +24,7 @@ do
 	--help|-h|-\?)	shift; printUsage "$0"; exit 0;;
 	--non-whitespace|-w)	shift; isNonWhitespace=t; tester=nonWhitespaceOutputOrError;;
 	--before|-b)		shift; isBefore=t;;
+	--or|-o)	shift; noOutputCommands+=(${noOutputCommands:+;} "$1"); shift;;
 	--command|-c)	shift; commands+=(${commands:+;} "$1"); isNeedEval=t; shift;;
 	--)		shift; break;;
 	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
@@ -93,4 +95,9 @@ else
 	runCommands || status=125
     fi
 fi
+
+if [ $status -eq 1 -a ${#noOutputCommands[@]} -gt 0 ]; then
+    eval "${noOutputCommands[@]}" || status=125
+fi
+
 exit $status
