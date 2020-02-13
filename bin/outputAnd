@@ -1,15 +1,43 @@
 #!/bin/bash
 
+printShortUsage()
+{
+    # Note: short followed by long option; if the user knows the short one, she can
+    # skim the long one.
+    printf 'Usage: cat FILE [...] | %q %s\n' "$(basename "$1")" '[-w|--non-whitespace] [-b|--before] [-o|--or "NOOUT-COMMANDLINE" [...]] -c|--command "COMMANDLINE" [-c ...] | [--] SIMPLECOMMAND [...] [-?|-h|--help]'
+}
 printUsage()
 {
+    # This is the short help when launched with no or incorrect arguments.
+    # It is printed to stderr to avoid accidental processing.
+    printShortUsage "$1" >&2
+    printf >&2 'Try %q --help for more information.\n' "$(basename "$1")"
+}
+printLongUsage()
+{
+    # This is the long "man page" when launched with the help argument.
+    # It is printed to stdout to allow paging with 'more'.
+    cat <<HELPDESCRIPTION
+If there's output, execute COMMANDS after the output is printed.
+HELPDESCRIPTION
+    echo
+    printShortUsage "$1"
     cat <<HELPTEXT
-If there's output (with -w|--non-whitespace: output that does contains at least
-one non-whitespace character), execute the shell COMMANDS after (with
--b|--before: before) the output is printed. (Else, execute NOOUT-COMMANDLINE.)
-If no output is piped into the command, nothing is executed, and the exit status
-is 1. If COMMANDS fail, the exit status is 125.
+    --non-whitespace|-w	    Output needs to contain at least one non-whitespace
+			    character to be accepted.
+    --before|-b		    Execute COMMANDS before the output is printed.
+    --or|-o NOOUT-COMMANDLINE
+			    Execute NOOUT-COMMANDLINE if no (accepted) output
+			    has occurred. With this, you can handle both
+			    outcomes; i.e. either this or COMMANDS will be
+			    executed, never both.
+EXIT STATUS:
+    0	Output occurred, and COMMANDS executed successfully.
+    1	No output has been piped into the command (and NOOUT-COMMANDLINE
+	executed successfully).
+    125	COMMANDS have failed.
+    126	NOOUT-COMMANDLINE has failed.
 HELPTEXT
-    printf 'Usage: cat FILE [...] | %q %s\n' "$(basename "$1")" '[-w|--non-whitespace] [-b|--before] [-o|--or "NOOUT-COMMANDLINE" [...]] -c|--command "COMMANDLINE" [-c ...] | [--] SIMPLECOMMAND [...] [-?|-h|--help]'
 }
 
 isNeedEval=
@@ -21,7 +49,7 @@ isBefore=
 while [ $# -ne 0 ]
 do
     case "$1" in
-	--help|-h|-\?)	shift; printUsage "$0"; exit 0;;
+	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
 	--non-whitespace|-w)	shift; isNonWhitespace=t; tester=nonWhitespaceOutputOrError;;
 	--before|-b)		shift; isBefore=t;;
 	--or|-o)	shift; noOutputCommands+=(${noOutputCommands:+;} "$1"); shift;;
@@ -97,7 +125,7 @@ else
 fi
 
 if [ $status -eq 1 -a ${#noOutputCommands[@]} -gt 0 ]; then
-    eval "${noOutputCommands[@]}" || status=125
+    eval "${noOutputCommands[@]}" || status=126
 fi
 
 exit $status
