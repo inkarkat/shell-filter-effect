@@ -9,7 +9,7 @@ one non-whitespace character), execute the shell COMMANDS after (with
 If no output is piped into the command, nothing is executed, and the exit status
 is 1. If COMMANDS fail, the exit status is 125.
 HELPTEXT
-    printf 'Usage: %q %s\n' "$(basename "$1")" '[-w|--non-whitespace] [-b|--before] -c|--command "COMMANDLINE" [-c ...] | [--] SIMPLECOMMAND [...] [-?|-h|--help]'
+    printf 'Usage: cat FILE [...] | %q %s\n' "$(basename "$1")" '[-w|--non-whitespace] [-b|--before] -c|--command "COMMANDLINE" [-c ...] | [--] SIMPLECOMMAND [...] [-?|-h|--help]'
 }
 
 isNeedEval=
