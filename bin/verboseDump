@@ -1,0 +1,110 @@
+#!/bin/bash
+set -o pipefail
+
+printShortUsage()
+{
+    # Note: short followed by long option; if the user knows the short one, she can
+    # skim the long one.
+    printf 'Usage: cat FILE [...] | %q %s | ...\n' "$(basename "$1")" '[-w|--non-whitespace] [-m|--message MESSAGE] [-M|--empty-message EMPTY-MESSAGE] [-t|--to FILE [-a|--append]] [--sponge] [--args ARGUMENTS ...] [-?|-h|--help]'
+}
+printUsage()
+{
+    # This is the short help when launched with no or incorrect arguments.
+    # It is printed to stderr to avoid accidental processing.
+    printShortUsage "$1" >&2
+    printf >&2 'Try %q --help for more information.\n' "$(basename "$1")"
+}
+printLongUsage()
+{
+    # This is the long "man page" when launched with the help argument.
+    # It is printed to stdout to allow paging with 'more'.
+    cat <<HELPDESCRIPTION
+Duplicate standard input to standard error / passed FILE.
+HELPDESCRIPTION
+    echo
+    printShortUsage "$1"
+    cat <<HELPTEXT
+    --non-whitespace|-w	    Input needs to contain at least one non-whitespace
+			    character to be accepted for MESSAGE. (Even
+			    whitespace-only input is still passed to the sink,
+			    though.)
+    --message|-m MESSAGE    Prepend MESSAGE before any output.
+    --empty-message|-M EMPTY-MESSAGE
+			    Send EMPTY-MESSAGE to standard error / passed FILE
+			    if there's no input at all.
+    --to|-t FILE	    Duplicate to FILE instead of standard error.
+    --append|-a		    Append to FILE instead of overwriting it.
+    --sponge		    Soak up all input before passing anything one. Pass
+			    this if you use multiple occurrences (to the same
+			    sink) in a single pipeline and want to avoid that
+			    both are interleaved.
+    --args ARGUMENTS ...    Examine all following ARGUMENTS ... (up to --) for a
+			    -v|--verbose one and only do processing if one is
+			    found. Else, any input is just passively passed
+			    through. This simplifies integration into other
+			    shell scripts.
+EXIT STATUS:
+    0	Complete success.
+    1	Failed to write to FILE, or other problem.
+    2	Bad invocation, wrong or missing command-line arguments.
+
+Example:
+HELPTEXT
+    printf '%s | %q %s | %s\n' 'order-query' "$(basename "$1")" "-m 'Processed orders:' -M 'No orders today'" "xargs -d '\n' -L 1 notify-customer 'Your order has been sent.'"
+}
+
+typeset -a outputAndArgs=()
+outputMessage=
+emptyMessage=
+sink=/dev/stderr
+isAppend=
+isSponge=
+while [ $# -ne 0 ]
+do
+    case "$1" in
+	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
+	--non-whitespace|-w)
+			outputAndArgs+=("$1"); shift;;
+	--message|-m)	shift; outputMessage="$1"; shift;;
+	--empty-message|-M)
+			shift; emptyMessage="$1"; shift;;
+	--to|-t)	shift; sink="${1:?}"; shift;;
+	--append|-a)	shift; isAppend=t;;
+	--sponge)	shift; isSponge=t;;
+	--args)		shift
+			isVerbose=
+			while [ $# -ne 0 ]
+			do
+			    case "$1" in
+				--verbose|-v)	shift; isVerbose=t; break;;
+				--)		shift; break;;
+				*)		shift;;
+			    esac
+			done
+			[ "$isVerbose" ] || exec cat
+			set --
+			;;
+	--)		shift; break;;
+	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printShortUsage "$0"; } >&2; exit 2;;
+	*)		break;;
+    esac
+done
+if [ $# -ne 0 ]; then
+    printShortUsage "$0" >&2
+    exit 2
+fi
+if [ ! "$isAppend" ]; then
+    # Truncate the FILE.
+    (> "$sink") || exit $?
+fi
+printf -v quotedSink '%q' "$sink"
+if [ "$outputMessage" ]; then
+    printf -v quotedOutputMessage '%q' "$outputMessage"
+    outputAndArgs+=(--before --command "printf %s\\\\n $quotedOutputMessage >> $quotedSink")
+fi
+if [ "$emptyMessage" ]; then
+    printf -v quotedEmptyMessage '%q' "$emptyMessage"
+    outputAndArgs+=(--or "printf %s\\\\n $quotedEmptyMessage >> $quotedSink")
+fi
+
+eval "${isSponge:+sponge |}${outputAndArgs:+outputAnd}" '"${outputAndArgs[@]}"' "${outputAndArgs:+|} tee --append \"$sink\""
