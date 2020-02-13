@@ -5,7 +5,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: cat FILE [...] | %q %s | ...\n' "$(basename "$1")" '[-w|--non-whitespace] [-m|--message MESSAGE] [-M|--empty-message EMPTY-MESSAGE] [-t|--to FILE [-a|--append]] [--sponge] [--args ARGUMENTS ...] [-?|-h|--help]'
+    printf 'Usage: cat FILE [...] | %q %s | ...\n' "$(basename "$1")" '[-w|--non-whitespace] [-s|--skip PATTERN [...]] [-e|--regexp PATTERN [...]] [-m|--message MESSAGE] [-M|--empty-message EMPTY-MESSAGE] [-t|--to FILE [-a|--append]] [--sponge] [--args ARGUMENTS ...] [-?|-h|--help]'
 }
 printUsage()
 {
@@ -25,9 +25,12 @@ HELPDESCRIPTION
     printShortUsage "$1"
     cat <<HELPTEXT
     --non-whitespace|-w	    Input needs to contain at least one non-whitespace
-			    character to be accepted for MESSAGE. (Even
-			    whitespace-only input is still passed to the sink,
-			    though.)
+			    character to be accepted for MESSAGE, and to be
+			    duplicated.
+    --skip|-s PATTERN	    Do not duplicate lines that match PATTERN.
+    --regexp|-e PATTERN	    Only consider lines that match PATTERN for
+			    duplication; other lines (and those that also match
+			    --skip PATTERN) are ignored.
     --message|-m MESSAGE    Prepend MESSAGE before any output.
     --empty-message|-M EMPTY-MESSAGE
 			    Send EMPTY-MESSAGE to standard error / passed FILE
@@ -54,6 +57,7 @@ HELPTEXT
 }
 
 typeset -a outputAndArgs=()
+typeset -a filterTeeArgs=()
 outputMessage=
 emptyMessage=
 sink=/dev/stderr
@@ -64,7 +68,9 @@ do
     case "$1" in
 	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
 	--non-whitespace|-w)
-			outputAndArgs+=("$1"); shift;;
+			outputAndArgs+=("$1"); filterTeeArgs+=("$1"); shift;;
+	--skip|-s)	filterTeeArgs+=("$1" "$2"); shift; shift;;
+	--regexp|-e)	filterTeeArgs+=(--match "$2"); shift; shift;;
 	--message|-m)	shift; outputMessage="$1"; shift;;
 	--empty-message|-M)
 			shift; emptyMessage="$1"; shift;;
@@ -107,4 +113,4 @@ if [ "$emptyMessage" ]; then
     outputAndArgs+=(--or "printf %s\\\\n $quotedEmptyMessage >> $quotedSink")
 fi
 
-eval "${isSponge:+sponge |}${outputAndArgs:+outputAnd}" '"${outputAndArgs[@]}"' "${outputAndArgs:+|} tee --append \"$sink\""
+eval "${isSponge:+sponge |}${outputAndArgs:+outputAnd}" '"${outputAndArgs[@]}"' "${outputAndArgs:+|} ${filterTeeArgs:+filter}tee" '"${filterTeeArgs[@]}" --append "$sink"'
