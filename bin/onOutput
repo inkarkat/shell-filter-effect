@@ -5,7 +5,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: %q %s\n' "$(basename "$1")" '[-i|--interval INTERVAL[SUFFIX]] [-l|--line-interval LINE-NUM] [-w|--non-whitespace] [-b|--before|-a|--append|-p|--piped] [-s|--skip PATTERN [...]] [-m|--match PATTERN [...]] -c|--command "COMMANDLINE" [-c ...] | [--] SIMPLECOMMAND [...] [-?|-h|--help]'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[-i|--interval INTERVAL[SUFFIX]|-I|--immediate] [-l|--line-interval LINE-NUM] [-w|--non-whitespace] [-b|--before|-a|--append|-p|--piped] [-s|--skip PATTERN [...]] [-m|--match PATTERN [...]] -c|--command "COMMANDLINE" [-c ...] | [--] SIMPLECOMMAND [...] [-?|-h|--help]'
 }
 printUsage()
 {
@@ -31,6 +31,8 @@ HELPDESCRIPTION
 			    COMMANDS, even if there's continuous output. SUFFIX
 			    may be 's' for seconds (the default), 'm' for
 			    minutes, 'h' for hours or 'd' for days.
+    --immediate|-I	    Directly execute COMMANDS for every (matching / not
+			    skipped) line; don't wait INTERVAL seconds.
     --line-interval|-l LINE-NUM
 			    Wait until LINE-NUM lines have been output before
 			    doing another execution of COMMANDS. If INTERVAL is
@@ -77,6 +79,7 @@ do
 			esac
 			shift
 			;;
+	--immediate|-I)		shift; interval=0;;
 	--line-interval|-l)	shift; lineInterval="${1:?}"; shift;;
 	--non-whitespace|-w)	shift; isNonWhitespace=t;;
 	--before|-b)	shift
