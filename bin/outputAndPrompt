@@ -5,14 +5,16 @@ printUsage()
     cat <<HELPTEXT
 If there's output (with -w|--non-whitespace: output that does contains at least
 one non-whitespace character), show PROMPT (with -b|--before: before the output)
-and wait for acknowledgement (with -t|--timeout: for TIMEOUT seconds).
+and wait for acknowledgement (with -t|--timeout: for TIMEOUT seconds). The
+prompt is cleared (unless -k|--keep-prompt is given).
 If no output is piped into the command, there's no prompt, and the exit status
 is 1.
 HELPTEXT
-    printf 'Usage: cat FILE [...] | %q %s\n' "$(basename "$1")" '[-w|--non-whitespace] [-b|--before] [-t|--timeout TIMEOUT] [PROMPT] [-?|-h|--help]'
+    printf 'Usage: cat FILE [...] | %q %s\n' "$(basename "$1")" '[-w|--non-whitespace] [-b|--before|-k|--keep-prompt] [-t|--timeout TIMEOUT] [PROMPT] [-?|-h|--help]'
 }
 
 isAfter=t
+keepPromptSequence='[1G[2K' # Return cursor to the beginning of the current line and clear it.
 typeset readArgs=()
 timeoutValue=
 typeset -a forwardedArgs=()
@@ -22,6 +24,7 @@ do
 	--help|-h|-\?)	shift; printUsage "$0"; exit 0;;
 	--non-whitespace|-w)	forwardedArgs+=("$1"); shift;;
 	--before|-b)		forwardedArgs+=("$1"); shift; isAfter=;;
+	--keep-prompt|-k)	shift; keepPromptSequence="$'\n'";;
 	--timeout|-t)	shift; readArgs+=(-t "$1"); timeoutPlural=s; [ "$1" = 1 ] && timeoutPlural=; timeoutValue="${1} second$timeoutPlural"; shift;;
 	--)		shift; break;;
 	*)		break;;
@@ -37,7 +40,7 @@ readArgs+=(-p "${isAfter:+$promptText}")
 
 if [ "$isAfter" ]; then
     printf -v quotedReadArgs '%q ' "${readArgs[@]}"; quotedReadArgs=${quotedReadArgs% }
-    exec outputAnd "${forwardedArgs[@]}" --command "< /dev/tty read -r -s -N 1 $quotedReadArgs; echo"
+    exec outputAnd "${forwardedArgs[@]}" --command "< /dev/tty read -r -s -N 1 $quotedReadArgs; printf >&2 %s ${keepPromptSequence}"
 else
     # Only the prompt itself must be printed before the output, as read would
     # block and prevent the printing of output. We know whether we need
