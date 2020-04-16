@@ -40,7 +40,7 @@ readArgs+=(-p "${isAfter:+$promptText}")
 
 if [ "$isAfter" ]; then
     printf -v quotedReadArgs '%q ' "${readArgs[@]}"; quotedReadArgs=${quotedReadArgs% }
-    exec outputAnd "${forwardedArgs[@]}" --command "< /dev/tty read -r -s -N 1 $quotedReadArgs; printf >&2 %s ${keepPromptSequence}"
+    exec outputAnd "${forwardedArgs[@]}" --command "< /dev/tty read -r -s -N 1 $quotedReadArgs; printf >/dev/tty %s ${keepPromptSequence}"
 else
     # Only the prompt itself must be printed before the output, as read would
     # block and prevent the printing of output. We know whether we need
