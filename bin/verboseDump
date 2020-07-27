@@ -5,7 +5,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: cat FILE [...] | %q %s | ...\n' "$(basename "$1")" '[-w|--non-whitespace] [-s|--skip PATTERN [...]] [-e|--regexp PATTERN [...]] [-m|--message MESSAGE] [-M|--empty-message EMPTY-MESSAGE] [-t|--to FILE [-a|--append]] [--sponge] [--args ARGUMENTS ...] [-?|-h|--help]'
+    printf 'Usage: cat FILE [...] | %q %s | ...\n' "$(basename "$1")" '[-w|--non-whitespace] [-s|--skip PATTERN [...]] [-e|--regexp PATTERN [...]] [-m|--message MESSAGE] [-M|--empty-message EMPTY-MESSAGE] [-o|--to FILE [-a|--append]] [--sponge] [--args ARGUMENTS ...] [-?|-h|--help]'
 }
 printUsage()
 {
@@ -35,7 +35,7 @@ HELPDESCRIPTION
     --empty-message|-M EMPTY-MESSAGE
 			    Send EMPTY-MESSAGE to standard error / passed FILE
 			    if there's no input at all.
-    --to|-t FILE	    Duplicate to FILE instead of standard error.
+    --to|-o FILE	    Duplicate to FILE instead of standard error.
     --append|-a		    Append to FILE instead of overwriting it.
     --sponge		    Soak up all input before passing anything one. Pass
 			    this if you use multiple occurrences (to the same
@@ -74,7 +74,7 @@ do
 	--message|-m)	shift; outputMessage="$1"; shift;;
 	--empty-message|-M)
 			shift; emptyMessage="$1"; shift;;
-	--to|-t)	shift; VERBOSEDUMP_SINK="${1:?}"; shift;;
+	--to|-o)	shift; VERBOSEDUMP_SINK="${1:?}"; shift;;
 	--append|-a)	shift; isAppend=t;;
 	--sponge)	shift; isSponge=t;;
 	--args)		shift
