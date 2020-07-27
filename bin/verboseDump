@@ -60,7 +60,7 @@ typeset -a outputAndArgs=()
 typeset -a filterTeeArgs=()
 outputMessage=
 emptyMessage=
-sink=/dev/stderr
+: ${VERBOSEDUMP_SINK:=/dev/stderr}
 isAppend=
 isSponge=
 while [ $# -ne 0 ]
@@ -74,7 +74,7 @@ do
 	--message|-m)	shift; outputMessage="$1"; shift;;
 	--empty-message|-M)
 			shift; emptyMessage="$1"; shift;;
-	--to|-t)	shift; sink="${1:?}"; shift;;
+	--to|-t)	shift; VERBOSEDUMP_SINK="${1:?}"; shift;;
 	--append|-a)	shift; isAppend=t;;
 	--sponge)	shift; isSponge=t;;
 	--args)		shift
@@ -101,9 +101,9 @@ if [ $# -ne 0 ]; then
 fi
 if [ ! "$isAppend" ]; then
     # Truncate the FILE.
-    (> "$sink") || exit $?
+    (> "$VERBOSEDUMP_SINK") || exit $?
 fi
-printf -v quotedSink '%q' "$sink"
+printf -v quotedSink '%q' "$VERBOSEDUMP_SINK"
 if [ "$outputMessage" ]; then
     printf -v quotedOutputMessage '%q' "$outputMessage"
     outputAndArgs+=(--before --command "printf %s\\\\n $quotedOutputMessage >> $quotedSink")
@@ -113,4 +113,4 @@ if [ "$emptyMessage" ]; then
     outputAndArgs+=(--or "printf %s\\\\n $quotedEmptyMessage >> $quotedSink")
 fi
 
-eval "${isSponge:+sponge |}${outputAndArgs:+outputAnd}" '"${outputAndArgs[@]}"' "${outputAndArgs:+|} ${filterTeeArgs:+filter}tee" '"${filterTeeArgs[@]}" --append "$sink"'
+eval "${isSponge:+sponge |}${outputAndArgs:+outputAnd}" '"${outputAndArgs[@]}"' "${outputAndArgs:+|} ${filterTeeArgs:+filter}tee" '"${filterTeeArgs[@]}" --append "$VERBOSEDUMP_SINK"'
