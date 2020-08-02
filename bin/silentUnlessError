@@ -5,6 +5,7 @@ printUsage()
     cat <<HELPTEXT
 Execute COMMAND. If it succeeds, its (normal and error) output is suppressed. In
 case of an unclean exit, the output is printed.
+See also: chronic COMMAND... (provided by GNU moreutils).
 HELPTEXT
 printf 'Usage: %q %s\n' "$(basename "$1")" '-c|--command "COMMANDLINE" [-c ...] | [--] SIMPLECOMMAND [...] [-?|-h|--help]'
 }
