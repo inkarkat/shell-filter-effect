@@ -43,6 +43,10 @@ if [ ${#commands[@]} -eq 0 ]; then
     exit 2
 fi
 
+breakPipeHint()
+{
+    [ "$name" ] && printf >&2 '%sBREAKPIPE=%q <commandline> # Skip the failing pipeline\n' "$PS4" "$name"
+}
 isBreakPipe()
 {
     case "${BREAKPIPE:-}" in 1|t|true) return 0;; esac
@@ -63,6 +67,7 @@ fi && exit
 
 status=$?
 if [ ${#altCommands[@]} -eq 0 ]; then
+    breakPipeHint
     cat -- "$TMPFILE"
     exit $status
 else
@@ -76,3 +81,6 @@ else
 	fi
     done
 fi
+status=$?
+[ $status -eq 0 ] || breakPipeHint
+exit $status
