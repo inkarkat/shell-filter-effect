@@ -1,11 +1,14 @@
 #!/bin/bash
 set -o pipefail
 
+: ${PIPEOR_FILE_MARKER:='{}'}
+fileMarker="$PIPEOR_FILE_MARKER"; unset PIPEOR_FILE_MARKER
+
 printUsage()
 {
     cat <<HELPTEXT
 If piping into COMMANDS does not succeed, pass the duplicated input as a file by
-replacing {} inside ALT-COMMANDS or pipe its contents into ALT-COMMANDS (one
+replacing $fileMarker inside ALT-COMMANDS or pipe its contents into ALT-COMMANDS (one
 after the other, until one succeeds) (Or just print it as-is and return the
 original exit status, if none is specified.)
 HELPTEXT
@@ -73,7 +76,8 @@ if [ ${#altCommands[@]} -eq 0 ]; then
 else
     for altCommand in "${altCommands[@]}"
     do
-	interpolatedAltCommand="${altCommand//\{\}/$quotedTMPFILE}"
+	interpolatedAltCommand="${altCommand//"$fileMarker"/$quotedTMPFILE}"
+
 	if [ "$interpolatedAltCommand" = "$altCommand" ]; then
 	    cat -- "$TMPFILE" | eval "$altCommand" && break
 	else
