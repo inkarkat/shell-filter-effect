@@ -5,7 +5,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: cat FILE [...] | %q %s\n' "$(basename "$1")" '[-i|--interval INTERVAL[SUFFIX]|-I|--immediate] [-l|--line-interval LINE-NUM] [-w|--non-whitespace] [-b|--before|-a|--append|-p|--piped] [-s|--skip PATTERN [...]] [-m|--match PATTERN [...]] -c|--command "COMMANDLINE" [-c ...] | [--] SIMPLECOMMAND [...] [-?|-h|--help]'
+    printf 'Usage: cat FILE [...] | %q %s\n' "$(basename "$1")" '[-i|--interval INTERVAL[SUFFIX]|-I|--immediate] [-l|--line-interval LINE-NUM] [-w|--non-whitespace] [-b|--before|-a|--append|-p|--piped] [-s|--skip PATTERN [...]] [-m|--match PATTERN [...]] [-n|--count N|-1|--once] -c|--command "COMMANDLINE" [-c ...] | [--] SIMPLECOMMAND [...] [-?|-h|--help]'
 }
 printUsage()
 {
@@ -60,6 +60,10 @@ HELPDESCRIPTION
     --match|-m PATTERN	    Only consider lines that match PATTERN for
 			    triggering COMMANDS execution; other lines (and
 			    those that also match --skip PATTERN) are ignored.
+    --count|-n N	    Stop reacting on new output after N executions of
+			    COMMAND.
+    --once|-1		    Only execute COMMAND once after the first
+			    observation of output.
 HELPTEXT
 }
 
@@ -140,6 +144,7 @@ isNonWhitespace=
 mode=
 skipPattern=
 matchPattern=
+count=
 process=print
 while [ $# -ne 0 ]
 do
@@ -180,6 +185,8 @@ do
 	--command|-c)	shift; commands+=(${commands:+;} "$1"); isNeedEval=t; shift;;
 	--skip|-s)	shift; skipPattern="${skipPattern}${skipPattern:+|}${1:?}"; shift;;
 	--match|-m)	shift; matchPattern="${matchPattern}${matchPattern:+|}${1:?}"; shift;;
+	--count|-n)	shift; count="$1"; shift;;
+	--once|-1)	shift; count=1;;
 	--)		shift; break;;
 	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
 	*)		break;;
@@ -216,6 +223,11 @@ runCommands()
 	"${commands[@]}"
     fi
 )
+commandRunCnt=0
+hasReachedCountLimit()
+{
+    [ -n "$count" ] && [ $commandRunCnt -ge $count ]
+}
 
 collectedLines=
 EOL=$'\n'
@@ -229,6 +241,8 @@ do
     if [ "$isSkipThisLine" ]; then
 	if [ "$collectedLines" ]; then
 	    printf %s "$collectedLines" | runCommands || exit $?
+	    let commandRunCnt+=1
+	    hasReachedCountLimit && exec cat
 	    collectedLines=''
 	    SECONDS=0
 	    lineCnt=0
@@ -258,6 +272,8 @@ do
 		    ;;
 	    *)	    runCommands || exit $?;;
 	esac
+	let commandRunCnt+=1
+	hasReachedCountLimit && exec cat
 
 	case "$mode" in
 	    before) $process "${line}$EOL";;
@@ -268,5 +284,9 @@ do
     fi
 done
 if [ "$collectedLines" ]; then
-    printf %s "$collectedLines" | runCommands || exit $?
+    if hasReachedCountLimit; then
+	printf %s "$collectedLines"
+    else
+	printf %s "$collectedLines" | runCommands || exit $?
+    fi
 fi
