@@ -5,7 +5,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: cat FILE [...] | %q %s\n' "$(basename "$1")" '[-i|--interval INTERVAL[SUFFIX]|-I|--immediate] [-l|--line-interval LINE-NUM] [-w|--non-whitespace] [-b|--before|-a|--append|-p|--piped] [-s|--skip PATTERN [...]] [-m|--match PATTERN [...]] [-n|--count N|-1|--once] -c|--command "COMMANDLINE" [-c ...] | [--] SIMPLECOMMAND [...] [-?|-h|--help]'
+    printf 'Usage: cat FILE [...] | %q %s\n' "$(basename "$1")" '[-i|--interval INTERVAL[SUFFIX] [-I|--initial-interval INTERVAL[SUFFIX]]|-M|--immediate] [-l|--line-interval LINE-NUM] [-w|--non-whitespace] [-b|--before|-a|--append|-p|--piped] [-s|--skip PATTERN [...]] [-m|--match PATTERN [...]] [-n|--count N|-1|--once] -c|--command "COMMANDLINE" [-c ...] | [--] SIMPLECOMMAND [...] [-?|-h|--help]'
 }
 printUsage()
 {
@@ -33,12 +33,16 @@ HELPDESCRIPTION
 			    minutes, 'h' for hours or 'd' for days.
 			    ADJUSTMENT can change the original value after every
 			    iteration. It starts with either + or -, followed by
-			    TIMESPAN, optionally followed by either SUFFIX or %.
+			    INTERVAL, optionally followed by either SUFFIX or %.
 			    For example, 10m+30s starts with 10 minutes and then
 			    increases that by 30 seconds on every iteration.
 			    10-5% starts with 10 seconds and then continually
 			    decreases that by 5 percent.
-    --immediate|-I	    Directly execute COMMANDS for every (matching / not
+    --initial-interval|-I INTERVAL[SUFFIX]
+			    There must be output for at least INTERVAL seconds
+			    before first executing COMMANDS. By default, the
+			    first output immediately triggers COMMANDS.
+    --immediate|-M	    Directly execute COMMANDS for every (matching / not
 			    skipped) line; don't wait INTERVAL seconds.
     --line-interval|-l LINE-NUM
 			    Wait until LINE-NUM lines have been output before
@@ -137,6 +141,7 @@ adjust()
 
 interval=1
 intervalAdjustment=
+initialDelay=0
 lineInterval=
 isNeedEval=
 typeset -a commands=()
@@ -151,7 +156,8 @@ do
     case "$1" in
 	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
 	--interval|-i)		shift; < <(timeWithAdjustmentToSeconds "$1") IFS=$'\t' read -r interval intervalAdjustment || exit 2; shift;;
-	--immediate|-I)		shift; interval=0;;
+	--immediate|-M)		shift; interval=0;;
+	--initial-interval|-I)	shift; initialDelay="$(timeToSeconds "$1")" || exit $?; shift;;
 	--line-interval|-l)	shift; lineInterval="${1:?}"; shift;;
 	--non-whitespace|-w)	shift; isNonWhitespace=t;;
 	--before|-b)	shift
@@ -231,7 +237,7 @@ hasReachedCountLimit()
 
 collectedLines=
 EOL=$'\n'
-SECONDS=0
+SECONDS=$((interval - initialDelay))
 lineCnt=0
 while IFS=$'\n' read -r line || { EOL=; [ -n "$line" ]; }
 do
