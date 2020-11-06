@@ -12,7 +12,7 @@ printUsage()
     # This is the short help when launched with no or incorrect arguments.
     # It is printed to stderr to avoid accidental processing.
     printShortUsage "$1" >&2
-    printf >&2 'Try %q --help for more information.\n' "$(basename "$1")"
+    printf >&2 '\nTry %q --help for more information.\n' "$(basename "$1")"
 }
 printLongUsage()
 {
@@ -162,29 +162,29 @@ do
 	--non-whitespace|-w)	shift; isNonWhitespace=t;;
 	--before|-b)	shift
 			if [ "$mode" ]; then
-			    echo >&2 "ERROR: Cannot combine --before with --${mode}."
-			    echo >&2
-			    printShortUsage "$0" >&2
+			    echo "ERROR: Cannot combine --before with --${mode}."
+			    echo
+			    printUsage "$0"
 			    exit 2
-			fi
+			fi >&2
 			mode=before
 			;;
 	--append|-a)	shift
 			if [ "$mode" ]; then
-			    echo >&2 "ERROR: Cannot combine --append with --${mode}."
-			    echo >&2
-			    printShortUsage "$0" >&2
+			    echo "ERROR: Cannot combine --append with --${mode}."
+			    echo
+			    printUsage "$0"
 			    exit 2
-			fi
+			fi >&2
 			mode=append
 			;;
 	--piped|-p)	shift
 			if [ "$mode" ]; then
-			    echo >&2 "ERROR: Cannot combine --piped with --${mode}."
-			    echo >&2
-			    printShortUsage "$0" >&2
+			    echo "ERROR: Cannot combine --piped with --${mode}."
+			    echo
+			    printUsage "$0"
 			    exit 2
-			fi
+			fi >&2
 			mode=piped
 			process=gather
 			;;
@@ -209,9 +209,11 @@ if [ $# -ne 0 ]; then
     fi
 fi
 if [ ${#commands[@]} -eq 0 ]; then
-    echo >&2 'ERROR: No COMMAND(s) specified; need to pass -c|--command "COMMANDLINE", or SIMPLECOMMAND.'
+    echo 'ERROR: No COMMAND(s) specified; need to pass -c|--command "COMMANDLINE", or SIMPLECOMMAND.'
+    echo
+    printUsage "$0"
     exit 2
-fi
+fi >&2
 
 print()
 {
