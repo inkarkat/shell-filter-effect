@@ -1,10 +1,13 @@
 #!/bin/bash
+set -o pipefail
+
+: ${PAGER:=less}
 
 printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: cat FILE [...] | %q %s\n' "$(basename "$1")" '-c|--command "COMMANDLINE [-c ...] | [--] SIMPLECOMMAND [...] [-?|-h|--help]'
+    printf 'Usage: cat FILE [...] | %q %s\n' "$(basename "$1")" '[-p|--paged] -c|--command "COMMANDLINE [-c ...] | [--] SIMPLECOMMAND [...] [-?|-h|--help]'
 }
 printUsage()
 {
@@ -25,17 +28,21 @@ HELPDESCRIPTION
     printShortUsage "$1"
     echo
     cat <<HELPTEXT
-    --command|-c CMD	Pipe the input into CMD. Multiple CMDs (and
-			SIMPLECOMMAND) are combined as pipelines, too.
+    --paged|-p		Send the output of COMMANDs to the pager (${PAGER}).
+    --command|-c CMD	Pipe the input into CMD if it's not piped somewhere
+			else. Multiple CMDs (and SIMPLECOMMAND) are combined as
+			pipelines, too.
 HELPTEXT
 }
 
+isPager=
 isNeedEval=
 typeset -a commands=()
 while [ $# -ne 0 ]
 do
     case "$1" in
 	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
+	--paged|-p)	shift; isPager=t;;
 	--command|-c)	shift; commands+=(${commands:+|} "$1"); isNeedEval=t; shift;;
 	--)		shift; break;;
 	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printShortUsage "$0"; } >&2; exit 2;;
@@ -61,8 +68,13 @@ fi >&2
 
 [ -t 1 ] || exec cat
 
-if [ "$isNeedEval" ]; then
-    eval "${commands[@]}"
-else
-    exec "${commands[@]}"
-fi
+runPipeline()
+{
+    if [ "$isNeedEval" ]; then
+	eval "${commands[@]}"
+    else
+	exec "${commands[@]}"
+    fi
+}
+
+eval 'runPipeline' "${isPager:+|\"$PAGER\" --RAW-CONTROL-CHARS}"
