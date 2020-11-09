@@ -20,7 +20,7 @@ do
 	--help|-h|-\?)	    shift; printUsage "$0"; exit 0;;
 	--output-file|-o)   shift; saveFile="$1"; shift;;
 	--append-output|-a) shift; saveFile="$1"; isAppend=t; shift;;
-	--name|-n)	args+=("$1" "$2"); commands="${commands}${commands:+ ; }$2"; shift; shift;;
+	--name|-n)	args+=("$1" "$2"); shift; shift;;
 	--command|-c)	args+=("$1" "$2"); commands="${commands}${commands:+ ; }$2"; shift; shift;;
 	--or)		args+=("$1" "$2"); shift; shift;;
 	--)		endArgs+=("$1"); shift; break;;
