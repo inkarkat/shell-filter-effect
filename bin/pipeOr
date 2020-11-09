@@ -7,12 +7,20 @@ fileMarker="$PIPEOR_FILE_MARKER"; unset PIPEOR_FILE_MARKER
 printUsage()
 {
     cat <<HELPTEXT
-If piping into COMMANDS does not succeed, ${fileMarker:+pass the duplicated input as a file by
-replacing $fileMarker inside ALT-COMMANDS or }pipe its contents into ALT-COMMANDS (one
+If piping into COMMANDs does not succeed, ${fileMarker:+pass the duplicated input as a file by
+replacing $fileMarker inside ALT-COMMANDs or }pipe its contents into ALT-COMMANDs (one
 after the other, until one succeeds) (Or just print it as-is and return the
 original exit status, if none is specified.)
 HELPTEXT
+    echo
     printf 'Usage: cat FILE [...] | %q %s\n' "$(basename "$1")" '[-o|--or "ALT-COMMANDLINE" [-o ...]] -c|--command "COMMANDLINE [-c ...] | [--] SIMPLECOMMAND [...] [-?|-h|--help]'
+
+    echo
+    cat <<HELPTEXT
+Skip all (1|t|true) / the pipeline with NAME by not executing COMMANDs /
+ALT-COMMANDs and just forwarding the input.
+HELPTEXT
+    echo
     printf 'Usage: cat FILE [...] | BREAKPIPE=1|t|true|NAME[,NAME2] %q %s\n' "$(basename "$1")" '-n|--name NAME [-o|--or "ALT-COMMANDLINE" [-o ...]] -c|--command "COMMANDLINE [-c ...] | [--] SIMPLECOMMAND [...] [-?|-h|--help]'
 }
 

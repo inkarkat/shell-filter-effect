@@ -6,7 +6,15 @@ printUsage()
 If piping into COMMANDS does not succeed, store the duplicated input into
 SAVE-FILE / a timestamped file in the current directory.
 HELPTEXT
+    echo
     printf 'Usage: cat FILE [...] | %q %s\n' "$(basename "$1")" '[-o|--output-file SAVE-FILE|-a|--append-output SAVE-FILE] [--or "ALT-COMMANDLINE" [-o ...]] -c|--command "COMMANDLINE [-c ...] | [--] SIMPLECOMMAND [...] [-?|-h|--help]'
+
+    echo
+    cat <<HELPTEXT
+Skip all (1|t|true) / the pipeline with NAME by not executing COMMANDs /
+ALT-COMMANDs and just forwarding the input.
+HELPTEXT
+    printf 'Usage: cat FILE [...] | BREAKPIPE=1|t|true|NAME[,NAME2] %q %s\n' "$(basename "$1")" '[-o|--output-file SAVE-FILE|-a|--append-output SAVE-FILE] -n|--name NAME [--or "ALT-COMMANDLINE" [-o ...]] -c|--command "COMMANDLINE [-c ...] | [--] SIMPLECOMMAND [...] [-?|-h|--help]'
 }
 
 saveFile=
