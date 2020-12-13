@@ -1,5 +1,16 @@
 #!/usr/bin/awk -f
 
+BEGIN {
+    if (ARGV[1] ~ /^(--(help|man|usage)|-[Hh?])$/) {
+	print "If output is piped into the command, it is passed through as-is."
+	print "If there's no output, exit with 1."
+	print ""
+	print "Usage: cat FILE [...] | outputOrError [-?|-H|--man|--usage] "
+	output = 1  # Make the END block succeed.
+	exit
+    }
+}
+
 { print; }
 { if ($0 != "") output = 1; }
 2 { output = 1; }
