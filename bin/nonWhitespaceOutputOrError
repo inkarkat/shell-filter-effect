@@ -1,5 +1,18 @@
 #!/usr/bin/awk -f
 
+BEGIN {
+    if (ARGV[1] ~ /^(--(help|man|usage)|-[Hh?])$/) {
+	print "If output is piped into the command, it is passed through as-is."
+	print "If there's no output that does not contain at least one non-whitespace"
+	print "character, exit with 1."
+	print ""
+	print "Usage: nonWhitespaceOutputOrError FILE [...] [-?|-H|--man|--usage]"
+	print "Usage: cat FILE [...] | nonWhitespaceOutputOrError"
+	output = 1  # Make the END block succeed.
+	exit
+    }
+}
+
 { print; }
 /\S/ { output = 1; }
 END { if (! output) exit 1; }
