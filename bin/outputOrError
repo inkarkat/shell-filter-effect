@@ -3,15 +3,24 @@
 BEGIN {
     if (ARGV[1] ~ /^(--(help|man|usage)|-[Hh?])$/) {
 	print "If output is piped into the command, it is passed through as-is."
-	print "If there's no output, exit with 1."
+	print "If there's no output (with -w|--non-whitespace: output that does not contain at"
+	print "least one non-whitespace character), exit with 1."
 	print ""
-	print "Usage: cat FILE [...] | outputOrError [-?|-H|--man|--usage] "
+	print "Usage: outputOrError [-w|--non-whitespace] FILE [...] [-?|-H|--man|--usage]"
+	print "Usage: cat FILE [...] | outputOrError [-w|--non-whitespace]"
 	output = 1  # Make the END block succeed.
 	exit
+    } else if (ARGV[1] ~ /^--non-whitespace|-w$/) {
+	delete ARGV[1]
+	isNonWhitespace = 1
     }
 }
 
 { print; }
-{ if ($0 != "") output = 1; }
-2 { output = 1; }
+
+! isNonWhitespace { if ($0 != "") output = 1; }
+! isNonWhitespace && 2 { output = 1; }
+
+isNonWhitespace && /\S/ { output = 1; }
+
 END { if (! output) exit 1; }
