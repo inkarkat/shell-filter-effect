@@ -1,31 +1,55 @@
 #!/bin/bash
 
+printShortUsage()
+{
+    # Note: short followed by long option; if the user knows the short one, she can
+    # skim the long one.
+    printf 'Usage: cat FILE [...] | %q %s\n' "$(basename "$1")" '[-w|--non-whitespace] [-b|--before|-k|--keep-prompt] [-t|--timeout|--for TIMEOUT] [PROMPT] [-?|-h|--help]'
+}
 printUsage()
 {
+    # This is the short help when launched with no or incorrect arguments.
+    # It is printed to stderr to avoid accidental processing.
+    printShortUsage "$1" >&2
+    printf >&2 '\nTry %q --help for more information.\n' "$(basename "$1")"
+}
+printLongUsage()
+{
+    # This is the long "man page" when launched with the help argument.
+    # It is printed to stdout to allow paging with 'more'.
+    cat <<HELPDESCRIPTION
+If there's output, show PROMPT and wait for acknowledgement. If no output is
+piped into the command, there's no prompt, and the exit status is 1.
+HELPDESCRIPTION
+    echo
+    printShortUsage "$1"
+    echo
     cat <<HELPTEXT
-If there's output (with -w|--non-whitespace: output that does contains at least
-one non-whitespace character), show PROMPT (with -b|--before: before the output)
-and wait for acknowledgement (with -t|--timeout: for TIMEOUT seconds). The
-prompt is cleared (unless -k|--keep-prompt is given).
-If no output is piped into the command, there's no prompt, and the exit status
-is 1.
+    --before|-b		Show the prompt before the output instead of after it.
+    --keep-prompt|-k	Keep the prompt on the screen instead of clearing it
+			after it has been acknowledged.
+    --non-whitespace|-w Only show the prompt if the output contains at least one
+			non-whitespace character.
+    --timeout|-t|--for SECONDS
+			Wait only for SECONDS instead of indefinitely, then
+			return no or what is set via --default.
 HELPTEXT
-    printf 'Usage: cat FILE [...] | %q %s\n' "$(basename "$1")" '[-w|--non-whitespace] [-b|--before|-k|--keep-prompt] [-t|--timeout TIMEOUT] [PROMPT] [-?|-h|--help]'
 }
 
+: ${POS1_AND_ERASE_LINE=[1G[2K}
 isAfter=t
-keepPromptSequence='[1G[2K' # Return cursor to the beginning of the current line and clear it.
+clearPromptSequence="$POS1_AND_ERASE_LINE" # Return cursor to the beginning of the current line and clear it.
 typeset readArgs=()
 timeoutValue=
 typeset -a forwardedArgs=()
 while [ $# -ne 0 ]
 do
     case "$1" in
-	--help|-h|-\?)	shift; printUsage "$0"; exit 0;;
+	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
 	--non-whitespace|-w)	forwardedArgs+=("$1"); shift;;
 	--before|-b)		forwardedArgs+=("$1"); shift; isAfter=;;
-	--keep-prompt|-k)	shift; keepPromptSequence="$'\n'";;
-	--timeout|-t)	shift; readArgs+=(-t "$1"); timeoutPlural=s; [ "$1" = 1 ] && timeoutPlural=; timeoutValue="${1} second$timeoutPlural"; shift;;
+	--keep-prompt|-k)	shift; clearPromptSequence="$'\n'";;
+	--timeout|-t|--for)	shift; readArgs+=(-t "$1"); timeoutPlural=s; [ "$1" = 1 ] && timeoutPlural=; timeoutValue="${1} second$timeoutPlural"; shift;;
 	--)		shift; break;;
 	*)		break;;
     esac
@@ -40,7 +64,7 @@ readArgs+=(-p "${isAfter:+$promptText}")
 
 if [ "$isAfter" ]; then
     printf -v quotedReadArgs '%q ' "${readArgs[@]}"; quotedReadArgs=${quotedReadArgs% }
-    exec outputAnd "${forwardedArgs[@]}" --command "< /dev/tty read -r -s -N 1 $quotedReadArgs; printf >/dev/tty %s ${keepPromptSequence}"
+    exec outputAnd "${forwardedArgs[@]}" --command "< /dev/tty read -r -s -N 1 $quotedReadArgs; printf >/dev/tty %s ${clearPromptSequence}"
 else
     # Only the prompt itself must be printed before the output, as read would
     # block and prevent the printing of output. We know whether we need
