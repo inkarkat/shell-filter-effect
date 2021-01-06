@@ -4,7 +4,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: cat FILE [...] | %q %s\n' "$(basename "$1")" '[-w|--non-whitespace] [-b|--before|-k|--keep-prompt] [-t|--timeout|--for TIMEOUT] [PROMPT] [-?|-h|--help]'
+    printf 'Usage: cat FILE [...] | %q %s\n' "$(basename "$1")" '[-w|--non-whitespace] [-b|--before|-k|--keep-prompt] [-t|--timeout|--for TIMEOUT] [--] [PROMPT] [-?|-h|--help]'
 }
 printUsage()
 {
@@ -27,7 +27,7 @@ HELPDESCRIPTION
     cat <<HELPTEXT
     --before|-b		Show the prompt before the output instead of after it.
     --keep-prompt|-k	Keep the prompt on the screen instead of clearing it
-			after it has been acknowledged.
+			after it has been acknowledged / after the timeout.
     --non-whitespace|-w Only show the prompt if the output contains at least one
 			non-whitespace character.
     --timeout|-t|--for SECONDS
