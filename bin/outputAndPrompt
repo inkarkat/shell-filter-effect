@@ -64,7 +64,7 @@ readArgs+=(-p "${isAfter:+$promptText}")
 
 if [ "$isAfter" ]; then
     printf -v quotedReadArgs '%q ' "${readArgs[@]}"; quotedReadArgs=${quotedReadArgs% }
-    exec outputAnd "${forwardedArgs[@]}" --command "< /dev/tty read -r -s -N 1 $quotedReadArgs; printf >/dev/tty %s ${clearPromptSequence}"
+    exec outputAnd "${forwardedArgs[@]}" --command "</dev/tty read -r -s -N 1 $quotedReadArgs; printf >/dev/tty %s ${clearPromptSequence}"
 else
     # Only the prompt itself must be printed before the output, as read would
     # block and prevent the printing of output. We know whether we need
@@ -72,5 +72,5 @@ else
     # without output) afterwards.
     printf -v quotedPromptText '%q' "$promptText"
     outputAnd "${forwardedArgs[@]}" --command "printf >&2 %s${promptText:+\\\\n} $quotedPromptText" && \
-	{ < /dev/tty read -r -s -N 1 "${readArgs[@]}"; exit 0; }
+	{ </dev/tty read -r -s -N 1 "${readArgs[@]}"; exit 0; }
 fi
