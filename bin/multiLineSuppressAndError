@@ -1,5 +1,11 @@
 #!/bin/sed -nf
 
+## If the input consists of more than a single line, suppress all output and
+## exit with 1. A single line or no input at all passes through.
+##
+## Usage: multiLineSuppressAndError FILE [...]
+## Usage: cat FILE [...] | multiLineSuppressAndError
+
 1h
 2q 1
 ${ g; p }
