@@ -1,15 +1,40 @@
 #!/bin/bash
 
+printShortUsage()
+{
+    # Note: short followed by long option; if the user knows the short one, she can
+    # skim the long one.
+    printf 'Usage: cat FILE [...] | %q %s\n' "$(basename "$1")" '[-w|--non-whitespace] [-o|--output FILESPEC|&N|-2|--stderr] [-a|--append] FORMAT [ARGUMENTS ...] [-?|-h|--help]'
+}
 printUsage()
 {
+    # This is the short help when launched with no or incorrect arguments.
+    # It is printed to stderr to avoid accidental processing.
+    printShortUsage "$1" >&2
+    printf >&2 '\nTry %q --help for more information.\n' "$(basename "$1")"
+}
+printLongUsage()
+{
+    # This is the long "man page" when launched with the help argument.
+    # It is printed to stdout to allow paging with 'more'.
+    cat <<HELPDESCRIPTION
+If there's output, printf FORMAT [ARGUMENTS ...] is printed before it.
+HELPDESCRIPTION
+    echo
+    printShortUsage "$1"
+    echo
     cat <<HELPTEXT
-If there's output (with -w|--non-whitespace: output that does contains at least
-one non-whitespace character), printf FORMAT [ARGUMENTS ...] (with -2|--stderr:
-to standard error) is printed before (with -a|--append: after) it.
-If no output is piped into the command, nothing is printed, and the exit status
-is 1.
+    --non-whitespace|-w	    Output needs to contain at least one non-whitespace
+			    character to print something.
+    --stderr|-2		    Print to standard error instead of standard out.
+    -o|--output FILESPEC|&N Append to FILESPEC / file descriptor N.
+    --append|-a		    Print after the output, not before it.
+
+EXIT STATUS:
+    0	Output occurred, and the printf executed successfully.
+    1	No output has been piped into the command.
+    125	printf has failed.
 HELPTEXT
-    printf 'Usage: cat FILE [...] | %q %s\n' "$(basename "$1")" '[-w|--non-whitespace] [-2|--stderr] [-a|--append] FORMAT [ARGUMENTS ...] [-?|-h|--help]'
 }
 
 redir=
@@ -18,9 +43,17 @@ typeset -a forwardedArgs=()
 while [ $# -ne 0 ]
 do
     case "$1" in
-	--help|-h|-\?)	shift; printUsage "$0"; exit 0;;
+	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
 	--non-whitespace|-w)	forwardedArgs+=("$1"); shift;;
 	--stderr|-2)		shift; redir='>&2';;
+	--output|-o)		shift
+				case "$1" in
+				    '')		printUsage "$0" >&2; exit 2;;
+				    \&[0-9])	redir=">$1";;
+				    ?*)		printf -v redir '>>%q' "$1";;
+				esac
+				shift
+				;;
 	--append|-a)		shift; beforeArg=();;
 	--)		shift; break;;
 	*)		break;;
