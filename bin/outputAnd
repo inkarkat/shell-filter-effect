@@ -4,7 +4,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: cat FILE [...] | %q %s\n' "$(basename "$1")" '[-w|--non-whitespace] [-b|--before] [-o|--or "NOOUT-COMMANDLINE" [...]] -c|--command "COMMANDLINE" [-c ...] | [--] SIMPLECOMMAND [...] [-?|-h|--help]'
+    printf 'Usage: cat FILE [...] | %q %s\n' "$(basename "$1")" '[-w|--non-whitespace] [-b|--before|-B|--before-command BEFORE-COMMANDLINE [...]] [-o|--or "NOOUT-COMMANDLINE" [...]] -c|--command "COMMANDLINE" [-c ...] | [--] SIMPLECOMMAND [...] [-?|-h|--help]'
 }
 printUsage()
 {
@@ -26,6 +26,10 @@ HELPDESCRIPTION
     --non-whitespace|-w	    Output needs to contain at least one non-whitespace
 			    character to be accepted.
     --before|-b		    Execute COMMANDS before the output is printed.
+    --before-command|-B	BEFORE-COMMANDLINE
+			    Execute BEFORE-COMMANDLINEs before the output is
+			    printed. If these fail, COMMANDS after the output
+			    will not run.
     --or|-o NOOUT-COMMANDLINE
 			    Execute NOOUT-COMMANDLINE if no (accepted) output
 			    has occurred. With this, you can handle both
@@ -46,17 +50,19 @@ typeset -a noOutputCommands=()
 tester=outputOrError
 isNonWhitespace=
 isBefore=
+typeset -a beforeCommands=()
 while [ $# -ne 0 ]
 do
     case "$1" in
-	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
+	--help|-h|-\?)		shift; printLongUsage "$0"; exit 0;;
 	--non-whitespace|-w)	shift; isNonWhitespace=t; tester=nonWhitespaceOutputOrError;;
 	--before|-b)		shift; isBefore=t;;
-	--or|-o)	shift; noOutputCommands+=(${noOutputCommands:+;} "$1"); shift;;
-	--command|-c)	shift; commands+=(${commands:+;} "$1"); isNeedEval=t; shift;;
-	--)		shift; break;;
-	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
-	*)		break;;
+	--before-command|-B)	shift; beforeCommands+=(${beforeCommands:+;} "$1"); shift;;
+	--or|-o)		shift; noOutputCommands+=(${noOutputCommands:+;} "$1"); shift;;
+	--command|-c)		shift; commands+=(${commands:+;} "$1"); isNeedEval=t; shift;;
+	--)			shift; break;;
+	-*)			{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
+	*)			break;;
     esac
 done
 if [ $# -ne 0 ]; then
@@ -85,7 +91,7 @@ runCommands()
 
 
 status=1
-if [ "$isBefore" ]; then
+if [ "$isBefore" ] || [ ${#beforeCommands[@]} -gt 0 ]; then
     isInputAvailable=t
 
     if [ "$isNonWhitespace" ]; then
@@ -101,7 +107,8 @@ if [ "$isBefore" ]; then
 	    fi
 	    if [[ "$lines" =~ [^[:space:]] ]]; then
 		status=0
-		runCommands || status=125
+		[ ! "$isBefore" ] || runCommands || status=125
+		[ ${#beforeCommands[@]} -eq 0 ] || eval "${beforeCommands[@]}" || status=125
 		break
 	    fi
 	done
@@ -110,14 +117,16 @@ if [ "$isBefore" ]; then
 	IFS=$'\n' read -r line || isInputAvailable=
 	if [ "$line" ]; then
 	    status=0
-	    runCommands || status=125
+	    [ ! "$isBefore" ] || runCommands || status=125
+	    [ ${#beforeCommands[@]} -eq 0 ] || eval "${beforeCommands[@]}" || status=125
 	    printf "%s${isInputAvailable:+\\n}" "$line"
 	fi
     fi
 
     if [ "$isInputAvailable" ]; then
-	cat
+	cat || status=3	# Can this happen?!
     fi
+    [ $status -ne 0 -o ${#beforeCommands[@]} -eq 0 -o ${#commands[@]} -eq 0 ] || runCommands || status=125
 else
     if $tester; then
 	status=0
