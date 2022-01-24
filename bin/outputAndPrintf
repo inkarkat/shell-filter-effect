@@ -30,6 +30,9 @@ HELPDESCRIPTION
     -o|--output FILESPEC|&N Append to FILESPEC / file descriptor N.
     --append|-a		    Print after the output, not before it.
 
+See also: padding can add (static, but multi-line) text before and after output
+it it's there.
+
 EXIT STATUS:
     0	Output occurred, and the printf executed successfully.
     1	No output has been piped into the command.
