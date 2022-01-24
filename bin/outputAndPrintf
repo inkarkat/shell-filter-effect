@@ -4,7 +4,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: cat FILE [...] | %q %s\n' "$(basename "$1")" '[-w|--non-whitespace] [-2|--stderr] [-a|--append] FORMAT [ARGUMENTS ...] [-?|-h|--help]'
+    printf 'Usage: cat FILE [...] | %q %s\n' "$(basename "$1")" '[-w|--non-whitespace] [-o|--output FILESPEC|&N|-2|--stderr] [-a|--append] FORMAT [ARGUMENTS ...] [-?|-h|--help]'
 }
 printUsage()
 {
@@ -27,6 +27,7 @@ HELPDESCRIPTION
     --non-whitespace|-w	    Output needs to contain at least one non-whitespace
 			    character to print something.
     --stderr|-2		    Print to standard error instead of standard out.
+    -o|--output FILESPEC|&N Append to FILESPEC / file descriptor N.
     --append|-a		    Print after the output, not before it.
 
 EXIT STATUS:
@@ -45,6 +46,14 @@ do
 	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
 	--non-whitespace|-w)	forwardedArgs+=("$1"); shift;;
 	--stderr|-2)		shift; redir='>&2';;
+	--output|-o)		shift
+				case "$1" in
+				    '')		printUsage "$0" >&2; exit 2;;
+				    \&[0-9])	redir=">$1";;
+				    ?*)		printf -v redir '>>%q' "$1";;
+				esac
+				shift
+				;;
 	--append|-a)		shift; beforeArg=();;
 	--)		shift; break;;
 	*)		break;;
