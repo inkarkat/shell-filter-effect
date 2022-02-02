@@ -18,29 +18,34 @@ printLongUsage()
     # This is the long "man page" when launched with the help argument.
     # It is printed to stdout to allow paging with 'more'.
     cat <<HELPDESCRIPTION
-If there's output, execute COMMANDS after the output is printed.
+If there's output, execute COMMAND(s) after the output is printed.
 HELPDESCRIPTION
     echo
     printShortUsage "$1"
     cat <<HELPTEXT
     --non-whitespace|-w	    Output needs to contain at least one non-whitespace
 			    character to be accepted.
-    --before|-b		    Execute COMMANDS before the output is printed.
+    --before|-b		    Execute COMMAND(s) before the output is printed.
     --before-command|-B	BEFORE-COMMANDLINE
 			    Execute BEFORE-COMMANDLINEs before the output is
-			    printed. If these fail, COMMANDS after the output
+			    printed. If these fail, COMMAND(s) after the output
 			    will not run.
     --or|-o NOOUT-COMMANDLINE
 			    Execute NOOUT-COMMANDLINE if no (accepted) output
 			    has occurred. With this, you can handle both
-			    outcomes; i.e. either this or COMMANDS will be
+			    outcomes; i.e. either this or COMMAND(s) will be
 			    executed, never both.
 EXIT STATUS:
-    0	Output occurred, and COMMANDS executed successfully.
+    0	Output occurred, and COMMAND(s) executed successfully.
     1	No output has been piped into the command (and NOOUT-COMMANDLINE
 	executed successfully).
-    125	COMMANDS have failed.
+    2	Bad invocation, wrong or missing command-line arguments.
+    125	COMMAND(s) have failed.
     126	NOOUT-COMMANDLINE has failed.
+
+SEE ALSO:
+Use ifne if you want to execute COMMAND(s) when output is available and have
+COMMAND(s) consume that output (instead of printing it beforehand).
 HELPTEXT
 }
 
