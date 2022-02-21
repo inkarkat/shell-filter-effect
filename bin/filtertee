@@ -32,6 +32,7 @@ HELPDESCRIPTION
     --match|-m PATTERN	    Only consider lines that match PATTERN when writing
 			    to FILE; other lines (and those that also match
 			    --skip PATTERN) are ignored (but still printed).
+    PATTERN is a POSIX-style unanchored extended regular expression.
 HELPTEXT
 }
 
