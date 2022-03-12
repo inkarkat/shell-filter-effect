@@ -4,7 +4,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: cat FILE [...] | %q %s\n' "$(basename "$1")" '[-w|--non-whitespace] [-o|--output FILESPEC|&N|-2|--stderr] [-a|--append] FORMAT [ARGUMENTS ...] [-?|-h|--help]'
+    printf 'Usage: cat FILE [...] | %q %s\n' "$(basename "$1")" '[-w|--non-whitespace] [-o|--output FILESPEC|&N|-2|--stderr] [-a|--append] [--] FORMAT [ARGUMENTS ...] [-?|-h|--help]'
 }
 printUsage()
 {
@@ -59,6 +59,7 @@ do
 				;;
 	--append|-a)		shift; beforeArg=();;
 	--)		shift; break;;
+	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
 	*)		break;;
     esac
 done

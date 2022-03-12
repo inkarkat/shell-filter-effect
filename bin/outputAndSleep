@@ -8,7 +8,7 @@ one non-whitespace character), pause for NUMBER seconds.
 If no output is piped into the command, there's no delay, and the exit status is
 1.
 HELPTEXT
-    printf 'Usage: cat FILE [...] | %q %s\n' "$(basename "$1")" '[-w|--non-whitespace] NUMBER[SUFFIX] [...] [-?|-h|--help]'
+    printf 'Usage: cat FILE [...] | %q %s\n' "$(basename "$1")" '[-w|--non-whitespace] [--] NUMBER[SUFFIX] [...] [-?|-h|--help]'
 }
 
 typeset -a forwardedArgs=()
@@ -18,6 +18,7 @@ do
 	--help|-h|-\?)	shift; printUsage "$0"; exit 0;;
 	--non-whitespace|-w)	forwardedArgs+=("$1"); shift;;
 	--)		shift; break;;
+	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
 	*)		break;;
     esac
 done

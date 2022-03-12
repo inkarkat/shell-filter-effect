@@ -8,7 +8,7 @@ If there's no output (with -w|--non-whitespace: output that does not contain at
 least one non-whitespace character), printf FORMAT [ARGUMENTS ...] instead (with
 -2|--stderr: to standard error).
 HELPTEXT
-    printf 'Usage: cat FILE [...] | %q %s\n' "$(basename "$1")" '[-w|--non-whitespace] [-2|--stderr] FORMAT [ARGUMENTS ...] [-?|-h|--help]'
+    printf 'Usage: cat FILE [...] | %q %s\n' "$(basename "$1")" '[-w|--non-whitespace] [-2|--stderr] [--] FORMAT [ARGUMENTS ...] [-?|-h|--help]'
 }
 
 redir=
@@ -20,6 +20,7 @@ do
 	--non-whitespace|-w)	shift; tester=nonWhitespaceOutputOrError;;
 	--stderr|-2)		shift; redir='>&2';;
 	--)		shift; break;;
+	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
 	*)		break;;
     esac
 done

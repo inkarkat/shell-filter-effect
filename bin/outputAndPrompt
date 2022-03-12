@@ -50,6 +50,7 @@ do
 	--before|-b)		forwardedArgs+=("$1"); shift; isAfter=;;
 	--keep-prompt|-k)	shift; clearPromptSequence="$'\n'";;
 	--timeout|-t|--for)	shift; readArgs+=(-t "$1"); timeoutPlural=s; [ "$1" = 1 ] && timeoutPlural=; timeoutValue="${1} second$timeoutPlural"; shift;;
+	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
 	--)		shift; break;;
 	*)		break;;
     esac
