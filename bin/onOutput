@@ -190,8 +190,8 @@ do
 			process=gather
 			;;
 	--command|-c)	shift; commands+=(${commands:+;} "$1"); isNeedEval=t; shift;;
-	--skip|-s)	shift; skipPattern="${skipPattern}${skipPattern:+|}${1:?}"; shift;;
-	--match|-m)	shift; matchPattern="${matchPattern}${matchPattern:+|}${1:?}"; shift;;
+	--skip|-s)	shift; skipPattern+="${skipPattern:+|}${1:?}"; shift;;
+	--match|-m)	shift; matchPattern+="${matchPattern:+|}${1:?}"; shift;;
 	--count|-n)	shift; count="$1"; shift;;
 	--once|-1)	shift; count=1;;
 	--)		shift; break;;
@@ -223,7 +223,7 @@ print()
 }
 gather()
 {
-    collectedLines="${collectedLines}$*"
+    collectedLines+="$*"
 }
 runCommands()
 (

@@ -105,9 +105,9 @@ if [ "$isBefore" ] || [ ${#beforeCommands[@]} -gt 0 ]; then
 	do
 	    if ! IFS=$'\n' read -r line; then
 		isInputAvailable=
-		lines="${lines}$line"
+		lines+="$line"
 	    else
-		lines="${lines}${line}
+		lines+="${line}
 "
 	    fi
 	    if [[ "$lines" =~ [^[:space:]] ]]; then

@@ -30,7 +30,7 @@ do
 	--output-file|-o)   shift; saveFile="$1"; shift;;
 	--append-output|-a) shift; saveFile="$1"; isAppend=t; shift;;
 	--name|-n)	args+=("$1" "$2"); shift; name="$1"; shift;;
-	--command|-c)	args+=("$1" "$2"); commands="${commands}${commands:+ ; }$2"; shift; shift;;
+	--command|-c)	args+=("$1" "$2"); commands+="${commands:+ ; }$2"; shift; shift;;
 	--or)		args+=("$1" "$2"); shift; shift;;
 	--)		endArgs+=("$1"); shift; break;;
 	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
@@ -39,7 +39,7 @@ do
 done
 if [ $# -ne 0 ]; then
     printf -v quotedSimpleCommands '%q ' "$@"
-    commands="${commands}${commands:+ ; }${quotedSimpleCommands% }"
+    commands+="${commands:+; }${quotedSimpleCommands% }"
 fi
 printf -v quotedCommands '%q' "$commands"
 
