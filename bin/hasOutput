@@ -4,8 +4,8 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: %q %s\n' "$(basename "$1")" '[-w|--non-whitespace] [--] FILE [...] [-?|-h|--help]'
-    printf 'Usage: cat FILE [...] | %q %s\n' "$(basename "$1")" '[-w|--non-whitespace]'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[-w|--non-whitespace] [-X|--abort] [--] FILE [...] [-?|-h|--help]'
+    printf 'Usage: cat FILE [...] | %q %s\n' "$(basename "$1")" '[-w|--non-whitespace] [-X|--abort]'
 }
 printUsage()
 {
@@ -28,6 +28,11 @@ HELPDESCRIPTION
     --non-whitespace|-w	Output that does not contain at least one non-whitespace
 			character is treated like no output and causes the
 			command to fail.
+    --abort|-X		Don't slurp in all remaining output, but abort early.
+			Note: This can cause the output command to fail with a
+			"broken pipe" error, but if you suppress standard error
+			and don't have "pipefail" set, this can avoid
+			unnecessary computation.
 EXIT STATUS:
     0	Output has been read and suppressed.
     1	No output received.
@@ -36,12 +41,14 @@ HELPTEXT
 }
 
 pattern='.'
+typeset -a onOutput=(exec cat)
 while [ $# -ne 0 ]
 do
     case "$1" in
 	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
 	--non-whitespace|-w)
 			shift; pattern='[^[:space:]]';;
+	--abort|-X)	shift; onOutput=(exit 0);;
 	--)		shift; break;;
 	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
 	*)		break;;
@@ -53,7 +60,7 @@ do
     IFS=$'\n' read -r line || { [[ "$line" =~ $pattern ]]; exit $?; }
     if [[ "$line" =~ $pattern ]]; then
 	# Slurp the remainder of the input.
-	exec cat >/dev/null 2>&1
+	"${onOutput[@]}" >/dev/null 2>&1
     fi
 done
 exit 1
