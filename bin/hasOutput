@@ -1,0 +1,59 @@
+#!/bin/bash
+
+printShortUsage()
+{
+    # Note: short followed by long option; if the user knows the short one, she can
+    # skim the long one.
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[-w|--non-whitespace] [--] FILE [...] [-?|-h|--help]'
+    printf 'Usage: cat FILE [...] | %q %s\n' "$(basename "$1")" '[-w|--non-whitespace]'
+}
+printUsage()
+{
+    # This is the short help when launched with no or incorrect arguments.
+    # It is printed to stderr to avoid accidental processing.
+    printShortUsage "$1" >&2
+    printf >&2 '\nTry %q --help for more information.\n' "$(basename "$1")"
+}
+printLongUsage()
+{
+    # This is the long "man page" when launched with the help argument.
+    # It is printed to stdout to allow paging with 'more'.
+    cat <<HELPDESCRIPTION
+Succeed only if output is piped into the command, and suppress all output.
+HELPDESCRIPTION
+    echo
+    printShortUsage "$1"
+    echo
+    cat <<HELPTEXT
+    --non-whitespace|-w	Output that does not contain at least one non-whitespace
+			character is treated like no output and causes the
+			command to fail.
+EXIT STATUS:
+    0	Output has been read and suppressed.
+    1	No output received.
+    2	Bad invocation, wrong or missing command-line arguments.
+HELPTEXT
+}
+
+pattern='.'
+while [ $# -ne 0 ]
+do
+    case "$1" in
+	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
+	--non-whitespace|-w)
+			shift; pattern='[^[:space:]]';;
+	--)		shift; break;;
+	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
+	*)		break;;
+    esac
+done
+
+while :
+do
+    IFS=$'\n' read -r line || { [[ "$line" =~ $pattern ]]; exit $?; }
+    if [[ "$line" =~ $pattern ]]; then
+	# Slurp the remainder of the input.
+	exec cat >/dev/null 2>&1
+    fi
+done
+exit 1
