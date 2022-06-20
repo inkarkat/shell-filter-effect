@@ -53,7 +53,7 @@ EXIT STATUS:
 
 Example:
 HELPTEXT
-    printf '%s | %q %s | %s\n' 'order-query' "$(basename "$1")" "-m 'Processed orders:' -M 'No orders today'" "xargs -d '\n' -L 1 notify-customer 'Your order has been sent.'"
+    printf '%s | %q %s | %s\n' 'order-query' "$(basename "$1")" "-m 'Processed orders:' -M 'No orders today'" "xargs -r -d '\n' -L 1 notify-customer 'Your order has been sent.'"
 }
 
 typeset -a outputAndArgs=()
