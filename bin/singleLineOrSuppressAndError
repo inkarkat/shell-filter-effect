@@ -4,8 +4,8 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: %q %s\n' "$(basename "$1")" 'FILE [...] [-?|-h|--help]'
-    printf 'Usage: cat FILE [...] | %q\n' "$(basename "$1")"
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[-v|--verbose|--no-input-error MSG --multiple-lines-error MSG] [--] FILE [...] [-?|-h|--help]'
+    printf 'Usage: cat FILE [...] | %q %s\n' "$(basename "$1")" '[...]'
 }
 printUsage()
 {
@@ -21,6 +21,17 @@ printLongUsage()
     cat <<HELPDESCRIPTION
 If the input consists of more than a single line or if there's no input at all,
 suppress all output and fail.
+HELPDESCRIPTION
+    echo
+    printShortUsage "$1"
+    echo
+    cat <<HELPTEXT
+    -v|--verbose	Print an error message complaining about no / too many
+			lines.
+    --no-input-error MSG
+			Print a custom MSG when no lines.
+    --multiple-lines-error MSG
+			Print a custom MSG when more than one line.
 
 EXIT STATUS:
     0	Exactly one line (with or without trailing newline) has been encountered
@@ -29,26 +40,38 @@ EXIT STATUS:
     2	Bad invocation, wrong or missing command-line arguments.
     3	Internal error or failed assertion.
     99	No input has been encountered.
-HELPDESCRIPTION
-    echo
-    printShortUsage "$1"
-    echo
-    cat <<HELPTEXT
-
 HELPTEXT
 }
-case "$1" in
-    --help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
-esac
+noInputErrorMessage=
+multipleLinesErrorMessage=
+while [ $# -ne 0 ]
+do
+    case "$1" in
+	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
+	--verbose|-v)	shift
+			noInputErrorMessage='ERROR: No input.'
+			multipleLinesErrorMessage='ERROR: More than one line.'
+			;;
+	--no-input-error)
+			shift; noInputErrorMessage="$1"; shift;;
+	--multiple-lines-error)
+			shift; multipleLinesErrorMessage="$1"; shift;;
+	--)		shift; break;;
+	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
+	*)		break;;
+    esac
+done
 
 isEOL=t
 if IFS=$'\n' read -r line || { isEOL=; [ -n "$line" ]; }; then
     if IFS=$'\n' read -r ignoredSecondLine; then
+	[ -z "$multipleLinesErrorMessage" ] || printf >&2 '%s\n' "$multipleLinesErrorMessage"
 	cat >/dev/null
 	exit 1
     fi
     printf "%s${isEOL:+\\n}" "$line"
     exit 0
 else
+    [ -z "$noInputErrorMessage" ] || printf >&2 '%s\n' "$noInputErrorMessage"
     exit 99
 fi
