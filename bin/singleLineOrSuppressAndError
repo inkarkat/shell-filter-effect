@@ -1,0 +1,27 @@
+#!/bin/bash
+
+printUsage()
+{
+    cat <<HELPTEXT
+If the input consists of more than a single line or if there's no input at all,
+suppress all output and exit with 1 (more than one line) or 99 (no input).
+HELPTEXT
+    echo
+    printf 'Usage: %q %s\n' "$(basename "$1")" 'FILE [...] [-?|-h|--help]'
+    printf 'Usage: cat FILE [...] | %q\n' "$(basename "$1")"
+}
+case "$1" in
+    --help|-h|-\?)	shift; printUsage "$0"; exit 0;;
+esac
+
+isEOL=t
+if IFS=$'\n' read -r line || { isEOL=; [ -n "$line" ]; }; then
+    if IFS=$'\n' read -r ignoredSecondLine; then
+	cat >/dev/null
+	exit 1
+    fi
+    printf "%s${isEOL:+\\n}" "$line"
+    exit 0
+else
+    exit 99
+fi
