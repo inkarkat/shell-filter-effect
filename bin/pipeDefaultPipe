@@ -7,7 +7,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: cat FILE [...] | %q %s\n' "$(basename "$1")" '[-p|--paged] -c|--command "COMMANDLINE [-c ...] | [--] SIMPLECOMMAND [...] [-?|-h|--help]'
+    printf 'Usage: cat FILE [...] | %q %s\n' "$(basename "$1")" '[-p|--paginate] -c|--command "COMMANDLINE [-c ...] | [--] SIMPLECOMMAND [...] [-?|-h|--help]'
 }
 printUsage()
 {
@@ -28,7 +28,7 @@ HELPDESCRIPTION
     printShortUsage "$1"
     echo
     cat <<HELPTEXT
-    --paged|-p		Send the output of COMMANDs to the pager (${PAGER}).
+    --paginate|-p	Send the output of COMMANDs to the pager (${PAGER}).
     --command|-c CMD	Pipe the input into CMD if it's not piped somewhere
 			else. Multiple CMDs (and SIMPLECOMMAND) are combined as
 			pipelines, too.
@@ -42,7 +42,7 @@ while [ $# -ne 0 ]
 do
     case "$1" in
 	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
-	--paged|-p)	shift; isPager=t;;
+	--paginate|-p)	shift; isPager=t;;
 	--command|-c)	shift; commands+=(${commands:+|} "$1"); isNeedEval=t; shift;;
 	--)		shift; break;;
 	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
