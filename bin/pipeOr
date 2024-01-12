@@ -25,7 +25,6 @@ HELPTEXT
 }
 
 name=
-isNeedEval=
 typeset -a commands=()
 typeset -a altCommands=()
 while [ $# -ne 0 ]
@@ -33,7 +32,7 @@ do
     case "$1" in
 	--help|-h|-\?)	shift; printUsage "$0"; exit 0;;
 	--name|-n)	shift; name="$1"; shift;;
-	--command|-c)	shift; commands+=(${commands:+;} "$1"); isNeedEval=t; shift;;
+	--command|-c)	shift; commands+=(${commands:+;} "$1"); shift;;
 	--or|-o)	shift; altCommands+=("$1"); shift;;
 	--)		shift; break;;
 	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
@@ -41,14 +40,10 @@ do
     esac
 done
 if [ $# -ne 0 ]; then
-    if [ "$isNeedEval" ]; then
-	# Combine --command and SIMPLECOMMAND; need to quote SIMPLECOMMAND to
-	# undo the effects of eval.
-	printf -v quotedSimpleCommand '%q ' "$@"
-	commands+=(${commands:+;} "${quotedSimpleCommand% }")
-    else
-	commands=("$@")
-    fi
+    # Combine --command and SIMPLECOMMAND; need to quote SIMPLECOMMAND to
+    # undo the effects of eval.
+    printf -v quotedSimpleCommand '%q ' "$@"
+    commands+=(${commands:+;} "${quotedSimpleCommand% }")
 fi
 if [ ${#commands[@]} -eq 0 ]; then
     echo >&2 'ERROR: No COMMAND(s) specified; need to pass -c|--command "COMMANDLINE", or SIMPLECOMMAND.'
@@ -71,11 +66,7 @@ TMPFILE="$(mktemp --tmpdir "$(basename -- "$0")-XXXXXX" 2>/dev/null || echo "${T
 printf -v quotedTMPFILE '%q' "$TMPFILE"
 [ "${DEBUG:-}" ] || trap 'rm -f "$TMPFILE" 2>/dev/null' EXIT
 
-tee "$TMPFILE" | if [ "$isNeedEval" ]; then
-    eval "${commands[@]}"
-else
-    "${commands[@]}"
-fi && exit
+tee "$TMPFILE" | eval "${commands[@]}" && exit
 
 status=$?
 if [ ${#altCommands[@]} -eq 0 ]; then

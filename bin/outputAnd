@@ -49,7 +49,6 @@ COMMAND(s) consume that output (instead of printing it beforehand).
 HELPTEXT
 }
 
-isNeedEval=
 typeset -a commands=()
 typeset -a noOutputCommands=()
 tester=outputOrError
@@ -64,21 +63,17 @@ do
 	--before|-b)		shift; isBefore=t;;
 	--before-command|-B)	shift; beforeCommands+=(${beforeCommands:+;} "$1"); shift;;
 	--or|-o)		shift; noOutputCommands+=(${noOutputCommands:+;} "$1"); shift;;
-	--command|-c)		shift; commands+=(${commands:+;} "$1"); isNeedEval=t; shift;;
+	--command|-c)		shift; commands+=(${commands:+;} "$1"); shift;;
 	--)			shift; break;;
 	-*)			{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
 	*)			break;;
     esac
 done
 if [ $# -ne 0 ]; then
-    if [ "$isNeedEval" ]; then
-	# Combine --command and SIMPLECOMMAND; need to quote SIMPLECOMMAND to
-	# undo the effects of eval.
-	printf -v quotedSimpleCommand '%q ' "$@"
-	commands+=(${commands:+;} "${quotedSimpleCommand% }")
-    else
-	commands=("$@")
-    fi
+    # Combine --command and SIMPLECOMMAND; need to quote SIMPLECOMMAND to
+    # undo the effects of eval.
+    printf -v quotedSimpleCommand '%q ' "$@"
+    commands+=(${commands:+;} "${quotedSimpleCommand% }")
 fi
 if [ ${#commands[@]} -eq 0 ]; then
     echo >&2 'ERROR: No COMMAND(s) specified; need to pass -c|--command "COMMANDLINE", or SIMPLECOMMAND.'
@@ -87,11 +82,7 @@ fi
 
 runCommands()
 (
-    if [ "$isNeedEval" ]; then
-	eval "${commands[@]}"
-    else
-	"${commands[@]}"
-    fi
+    eval "${commands[@]}"
 )
 
 
