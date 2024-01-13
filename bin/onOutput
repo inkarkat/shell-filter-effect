@@ -1,6 +1,8 @@
 #!/bin/bash
 shopt -qs extglob
 
+: ${ONOUTPUT_COMMAND_JOINER=;}
+
 printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
@@ -144,7 +146,7 @@ interval=1
 intervalAdjustment=
 initialDelay=0
 lineInterval=
-typeset -a commands=()
+commands=
 isNonWhitespace=
 mode=
 skipPattern=
@@ -188,7 +190,7 @@ do
 			mode=piped
 			process=gather
 			;;
-	--command|-c)	shift; commands+=(${commands:+;} "$1"); shift;;
+	--command|-c)	shift; commands+="${commands:+ $ONOUTPUT_COMMAND_JOINER }$1"; shift;;
 	--skip|-s)	shift; skipPattern+="${skipPattern:+|}${1:?}"; shift;;
 	--match|-m)	shift; matchPattern+="${matchPattern:+|}${1:?}"; shift;;
 	--count|-n)	shift; count="$1"; shift;;
@@ -203,9 +205,9 @@ if [ $# -ne 0 ]; then
     # Combine --command and SIMPLECOMMAND; need to quote SIMPLECOMMAND to
     # undo the effects of eval.
     printf -v quotedSimpleCommand '%q ' "$@"
-    commands+=(${commands:+;} "${quotedSimpleCommand% }")
+    commands+="${commands:+ $ONOUTPUT_COMMAND_JOINER }${quotedSimpleCommand% }"
 fi
-if [ ${#commands[@]} -eq 0 ]; then
+if [ -z "$commands" ]; then
     echo 'ERROR: No COMMAND(s) specified; need to pass -c|--command "COMMANDLINE", or SIMPLECOMMAND.'
     echo
     printUsage "$0"
@@ -222,7 +224,7 @@ gather()
 }
 runCommands()
 (
-    eval "${commands[@]}"
+    eval "$commands"
 )
 commandRunCnt=0
 hasReachedCountLimit()
