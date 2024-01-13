@@ -2,7 +2,6 @@
 set -o pipefail
 
 : ${PIPEDEFAULTPIPE_COMMAND_JOINER=|}
-: ${PAGER:=less}
 
 printShortUsage()
 {
@@ -64,5 +63,6 @@ fi >&2
 
 
 [ -t 1 ] || exec cat
+typeset -a pager=("${PAGER:-less}" --RAW-CONTROL-CHARS); [ "$isPager" ] || pager=()
 
-eval "$commands" "${isPager:+|\"$PAGER\" --RAW-CONTROL-CHARS}"
+eval "$commands" "${pager:+|}" '"${pager[@]}"'
