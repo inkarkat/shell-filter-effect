@@ -13,6 +13,6 @@ BEGIN {
     }
 }
 
-{ print; }
+{ printf("%s%s", $0, RT); }
 /\S/ { output = 1; }
 END { if (! output) exit 1; }
