@@ -37,7 +37,7 @@ HELPDESCRIPTION
 			    if there's no input at all.
     --to|-o FILE	    Duplicate to FILE instead of standard error.
     --append|-a		    Append to FILE instead of overwriting it.
-    --sponge		    Soak up all input before passing anything one. Pass
+    --sponge		    Soak up all input before passing anything on. Pass
 			    this if you use multiple occurrences (to the same
 			    sink) in a single pipeline and want to avoid that
 			    both are interleaved.
@@ -101,7 +101,7 @@ if [ $# -ne 0 ]; then
 fi
 if [ ! "$isAppend" ]; then
     # Truncate the FILE.
-    (> "$VERBOSEDUMP_SINK") || exit $?
+    (: > "$VERBOSEDUMP_SINK") || exit $?
 fi
 printf -v quotedSink '%q' "$VERBOSEDUMP_SINK"
 if [ "$outputMessage" ]; then
