@@ -33,6 +33,10 @@ HELPDESCRIPTION
 			    to FILE; other lines (and those that also match
 			    --skip PATTERN) are ignored (but still printed).
     PATTERN is a POSIX-style unanchored extended regular expression.
+
+SEE ALSO:
+- segregatetee also picks input lines but exclusively sends them to one of the
+  passed (sets of) FILE(s) for consumption; only left-overs to stdout.
 HELPTEXT
 }
 

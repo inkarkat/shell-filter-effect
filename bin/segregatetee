@@ -1,0 +1,150 @@
+#!/bin/bash
+
+printShortUsage()
+{
+    # Note: short followed by long option; if the user knows the short one, she can
+    # skim the long one.
+    printf 'Usage: %q %s\n' "$(basename "$1")" '(-m|--match PATTERN|-x|--exclude PATTERN [-a|--append] [--] [FILE ...]) ... [-?|-h|--help]'
+}
+printUsage()
+{
+    # This is the short help when launched with no or incorrect arguments.
+    # It is printed to stderr to avoid accidental processing.
+    printShortUsage "$1" >&2
+    printf >&2 '\nTry %q --help for more information.\n' "$(basename "$1")"
+}
+printLongUsage()
+{
+    # This is the long "man page" when launched with the help argument.
+    # It is printed to stdout to allow paging with 'more'.
+    cat <<HELPDESCRIPTION
+Read from standard input and write all (non-)matching lines to FILE(s). The
+first consumer wins; i.e. each line is only written to a single (set of)
+FILE(s). Any left-over lines are written to standard output.
+HELPDESCRIPTION
+    echo
+    printShortUsage "$1"
+    cat <<HELPTEXT
+    --match|-m PATTERN	    Only consider lines that match PATTERN when writing
+			    to the following FILE(s). If no FILE(s) are given,
+			    write to standard output.
+    --exclude|-x PATTERN    Only consider lines that do not match PATTERN when
+			    writing to the following FILE(s). If no FILE(s) are
+			    given, write to standard output.
+    --append|-a		    Append to the following FILE(s) instead of
+			    truncating them. Only applies to the following (set
+			    of) FILE(s).
+    PATTERN is a POSIX-style unanchored extended regular expression.
+
+SEE ALSO:
+- filtertee sends lines (or specificially non-whitespace lines) to FILE(s) based
+  on patterns but also prints everything to stdout.
+HELPTEXT
+}
+
+lastPattern=
+typeset -a matchPatterns=()
+typeset -A matchIsExclude=()
+typeset -A matchIsAppend=()
+typeset -A matchFileIndices=()
+typeset -a filespecs=()
+while [ $# -ne 0 ]
+do
+    case "$1" in
+	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
+	--match=*)	lastPattern="${1#--match=}"; shift; matchPatterns+=("$lastPattern"); matchIsExclude["$lastPattern"]=;;
+	--match|-m)	shift; lastPattern="${1:?}"; shift; matchPatterns+=("$lastPattern"); matchIsExclude["$lastPattern"]=;;
+	--exclude=*)	lastPattern="${1#--exclude=}"; shift; matchPatterns+=("$lastPattern"); matchIsExclude["$lastPattern"]=t;;
+	--exclude|-x)	shift; lastPattern="${1:?}"; shift; matchPatterns+=("$lastPattern"); matchIsExclude["$lastPattern"]=t;;
+	--append|-a)	shift
+			if [ -z "$lastPattern" ]; then
+			    echo 'ERROR: --append must follow a --match or --exclude parameter.'
+			    echo
+			    printUsage "$0"
+			    exit 2
+			elif [ -n "${matchFileIndices["$lastPattern"]}" ]; then
+			    echo 'ERROR: --append must immediately follow a --match or --exclude parameter.'
+			    echo
+			    printUsage "$0"
+			    exit 2
+			fi >&2
+			matchIsAppend["$lastPattern"]=t
+			;;
+	-|-[^-]*|--?*)	{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
+	--)		shift;&
+	*)		if [ -z "$lastPattern" ]; then
+			    echo 'ERROR: FILE(s) must follow a --match or --exclude parameter.'
+			    echo
+			    printUsage "$0"
+			    exit 2
+			fi >&2
+			for ((i = 0; i < ${#filespecs[@]}; i++))
+			do
+			    if [ "$1" = "${filespecs[$i]}" ]; then
+				matchFileIndices["$lastPattern"]+="$i "
+				shift
+				continue 2
+			    fi
+			done
+			matchFileIndices["$lastPattern"]+="${#filespecs[@]} "
+			filespecs+=("$1")
+			shift
+			;;
+    esac
+done
+if [ ${#matchPatterns[@]} -eq 0 ]; then
+    echo 'ERROR: No --match or --exclude passed.'
+    echo
+    printUsage "$0"
+    exit 2
+fi >&2
+
+write()
+{
+    local contents="${1?}"; shift
+    local fileIndices="${1?}"; shift
+    local isAppend="${1?}"; shift
+
+    if [ -z "$fileIndices" ]; then
+	printf %s "$contents"
+	return
+    fi
+
+    local i; for i in $fileIndices
+    do
+	local file="${filespecs[$i]}"
+	[ -n "$file" ] || continue
+	eval 'printf %s "$contents"' ">${isAppend:+>}" '"$file"' || {
+	    status=1
+	    filespecs[$i]=''	# Remove a problematic file from the roster; this is different from tee's behavior which keeps open a file handle and therefore isn't affected by chmod or removal after the fact.
+	}
+    done
+}
+
+status=0
+# Try to truncate / open for writing all passed FILEs at the beginning; this is
+# how tee works, too. We can sift out problematic files already here.
+for match in "${matchPatterns[@]}"
+do
+    write '' "${matchFileIndices["$match"]}" "${matchIsAppend["$match"]}"
+done
+
+EOL=$'\n'
+while IFS=$'\n' read -r line || { EOL=; [ -n "$line" ]; }
+do
+    hasMatch=
+    for match in "${matchPatterns[@]}"
+    do
+	isExclude="${matchIsExclude["$match"]}"
+	isMatch=; [[ "$line" =~ $match ]] && isMatch=t
+	if { [ "$isExclude" ] && [ ! "$isMatch" ]; } \
+	    || { [ ! "$isExclude" ] && [ "$isMatch" ]; }
+	then
+	    write "${line}$EOL" "${matchFileIndices["$match"]}" t
+	    hasMatch=t
+	    break
+	fi
+    done
+    [ "$hasMatch" ] || printf %s "${line}$EOL"
+done
+exit $status
