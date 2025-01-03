@@ -47,12 +47,27 @@ SEE ALSO:
 HELPTEXT
 }
 
+typeset -a filespecs=()
+addFile()
+{
+    local varname="${1:?}"; shift
+    local file="${1:?}"; shift
+    local i; for ((i = 0; i < ${#filespecs[@]}; i++))
+    do
+	if [ "$file" = "${filespecs[$i]}" ]; then
+	    eval "${varname}+=\"\$i \""
+	    return
+	fi
+    done
+    eval "${varname}+=\"\${#filespecs[@]} \""
+    filespecs+=("$file")
+}
+
 lastPattern=
 typeset -a matchPatterns=()
 typeset -A matchIsExclude=()
 typeset -A matchIsAppend=()
 typeset -A matchFileIndices=()
-typeset -a filespecs=()
 defaultFileIndices=
 while [ $# -ne 0 ]
 do
@@ -64,19 +79,7 @@ do
 	--exclude=*)	lastPattern="${1#--exclude=}"; shift; matchPatterns+=("$lastPattern"); matchIsExclude["$lastPattern"]=t;;
 	--exclude|-x)	shift; lastPattern="${1:?}"; shift; matchPatterns+=("$lastPattern"); matchIsExclude["$lastPattern"]=t;;
 
-	--to)		shift
-			for ((i = 0; i < ${#filespecs[@]}; i++))
-			do
-			    if [ "$1" = "${filespecs[$i]}" ]; then
-				defaultFileIndices+="$i "
-				shift
-				continue 2
-			    fi
-			done
-			defaultFileIndices+="${#filespecs[@]} "
-			filespecs+=("$1")
-			shift
-			;;
+	--to)		shift; addFile defaultFileIndices "${1:?}"; shift;;
 	--append|-a)	shift
 			if [ -z "$lastPattern" ]; then
 			    echo 'ERROR: --append must follow a --match or --exclude parameter.'
@@ -99,16 +102,7 @@ do
 			    printUsage "$0"
 			    exit 2
 			fi >&2
-			for ((i = 0; i < ${#filespecs[@]}; i++))
-			do
-			    if [ "$1" = "${filespecs[$i]}" ]; then
-				matchFileIndices["$lastPattern"]+="$i "
-				shift
-				continue 2
-			    fi
-			done
-			matchFileIndices["$lastPattern"]+="${#filespecs[@]} "
-			filespecs+=("$1")
+			addFile 'matchFileIndices["$lastPattern"]' "${1:?}"
 			shift
 			;;
     esac
