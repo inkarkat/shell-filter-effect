@@ -4,7 +4,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: %q %s\n' "$(basename "$1")" '(-m|--match PATTERN|-x|--exclude PATTERN [-a|--append] [--] [FILE ...]) ... [-?|-h|--help]'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[--to DEFAULT-FILE [--to ...]] (-m|--match PATTERN|-x|--exclude PATTERN [-a|--append] [--] [FILE ...]) ... [-?|-h|--help]'
 }
 printUsage()
 {
@@ -25,6 +25,11 @@ HELPDESCRIPTION
     echo
     printShortUsage "$1"
     cat <<HELPTEXT
+    --to DEFAULT-FILE	    Write to DEFAULT-FILE if no FILE(s) are given
+			    (instead of falling back to standard output). This
+			    allows to specify a FILE once for multiple PATTERNs
+			    without repeating it (which is important when using
+			    a single process substitution).
     --match|-m PATTERN	    Only consider lines that match PATTERN when writing
 			    to the following FILE(s). If no FILE(s) are given,
 			    write to standard output.
@@ -33,7 +38,7 @@ HELPDESCRIPTION
 			    given, write to standard output.
     --append|-a		    Append to the following FILE(s) instead of
 			    truncating them. Only applies to the following (set
-			    of) FILE(s).
+			    of) FILE(s) (or DEFAULT-FILE(s)).
     PATTERN is a POSIX-style unanchored extended regular expression.
 
 SEE ALSO:
@@ -42,20 +47,39 @@ SEE ALSO:
 HELPTEXT
 }
 
+typeset -a filespecs=()
+addFile()
+{
+    local varname="${1:?}"; shift
+    local file="${1:?}"; shift
+    local i; for ((i = 0; i < ${#filespecs[@]}; i++))
+    do
+	if [ "$file" = "${filespecs[$i]}" ]; then
+	    eval "${varname}+=\"\$i \""
+	    return
+	fi
+    done
+    eval "${varname}+=\"\${#filespecs[@]} \""
+    filespecs+=("$file")
+}
+
 lastPattern=
 typeset -a matchPatterns=()
 typeset -A matchIsExclude=()
 typeset -A matchIsAppend=()
 typeset -A matchFileIndices=()
-typeset -a filespecs=()
+defaultFileIndices=
 while [ $# -ne 0 ]
 do
     case "$1" in
 	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
+
 	--match=*)	lastPattern="${1#--match=}"; shift; matchPatterns+=("$lastPattern"); matchIsExclude["$lastPattern"]=;;
 	--match|-m)	shift; lastPattern="${1:?}"; shift; matchPatterns+=("$lastPattern"); matchIsExclude["$lastPattern"]=;;
 	--exclude=*)	lastPattern="${1#--exclude=}"; shift; matchPatterns+=("$lastPattern"); matchIsExclude["$lastPattern"]=t;;
 	--exclude|-x)	shift; lastPattern="${1:?}"; shift; matchPatterns+=("$lastPattern"); matchIsExclude["$lastPattern"]=t;;
+
+	--to)		shift; addFile defaultFileIndices "${1:?}"; shift;;
 	--append|-a)	shift
 			if [ -z "$lastPattern" ]; then
 			    echo 'ERROR: --append must follow a --match or --exclude parameter.'
@@ -78,16 +102,7 @@ do
 			    printUsage "$0"
 			    exit 2
 			fi >&2
-			for ((i = 0; i < ${#filespecs[@]}; i++))
-			do
-			    if [ "$1" = "${filespecs[$i]}" ]; then
-				matchFileIndices["$lastPattern"]+="$i "
-				shift
-				continue 2
-			    fi
-			done
-			matchFileIndices["$lastPattern"]+="${#filespecs[@]} "
-			filespecs+=("$1")
+			addFile 'matchFileIndices["$lastPattern"]' "${1:?}"
 			shift
 			;;
     esac
@@ -106,8 +121,12 @@ write()
     local isAppend="${1?}"; shift
 
     if [ -z "$fileIndices" ]; then
-	printf %s "$contents"
-	return
+	if [ -n "$defaultFileIndices" ]; then
+	    fileIndices="$defaultFileIndices"
+	else
+	    printf %s "$contents"
+	    return
+	fi
     fi
 
     local i; for i in $fileIndices
