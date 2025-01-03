@@ -2,6 +2,8 @@
 
 _Commands that perform some kind of action, often based on [the availability of] output piped into them, or the result of a command execution._
 
+![Build Status](https://github.com/inkarkat/shell-filter-effect/actions/workflows/build.yml/badge.svg)
+
 ### Dependencies
 
 * Bash, GNU `awk`, GNU `sed`
