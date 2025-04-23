@@ -1,0 +1,32 @@
+#!/bin/bash
+
+printUsage()
+{
+    cat <<HELPTEXT
+If output is piped into the command, it is passed through as-is.
+If there's no output (with -w|--non-whitespace: output that does not contain at
+least one non-whitespace character), printf FORMAT [ARGUMENTS ...] to standard
+error and exit with 1.
+HELPTEXT
+    printf 'Usage: cat FILE [...] | %q %s\n' "$(basename "$1")" '[-w|--non-whitespace] [--] FORMAT [ARGUMENTS ...] [-?|-h|--help]'
+}
+
+tester=outputOrError
+while [ $# -ne 0 ]
+do
+    case "$1" in
+	--help|-h|-\?)	shift; printUsage "$0"; exit 0;;
+	--non-whitespace|-w)	shift; tester=nonWhitespaceOutputOrError;;
+	--)		shift; break;;
+	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
+	*)		break;;
+    esac
+done
+if [ $# -eq 0 ]; then
+    printUsage "$0" >&2
+    exit 2
+fi
+
+$tester && exit 0
+printf >&2 "$@"
+exit 1
