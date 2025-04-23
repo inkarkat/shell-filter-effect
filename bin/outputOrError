@@ -1,18 +1,28 @@
 #!/usr/bin/awk -f
 
 BEGIN {
-    if (ARGV[1] ~ /^(--(help|man|usage)|-[Hh?])$/) {
-	print "If output is piped into the command, it is passed through as-is."
-	print "If there's no output (with -w|--non-whitespace: output that does not contain at"
-	print "least one non-whitespace character), exit with 1."
-	print ""
-	print "Usage: outputOrError [-w|--non-whitespace] FILE [...] [-?|-H|--man|--usage]"
-	print "Usage: cat FILE [...] | outputOrError [-w|--non-whitespace]"
-	output = 1  # Make the END block succeed.
-	exit
-    } else if (ARGV[1] ~ /^--non-whitespace|-w$/) {
-	delete ARGV[1]
-	isNonWhitespace = 1
+    errorStatus = 1
+    ARGB = 1
+    while (1) {
+	if (ARGV[ARGB] ~ /^(--(help|man|usage)|-[Hh?])$/) {
+	    print "If output is piped into the command, it is passed through as-is."
+	    print "If there's no output (with -w|--non-whitespace: output that does not contain at"
+	    print "least one non-whitespace character), exit with 1 / N."
+	    print ""
+	    print "Usage: outputOrError [-w|--non-whitespace] [--status N] FILE [...] [-?|-H|--man|--usage]"
+	    print "Usage: cat FILE [...] | outputOrError [-w|--non-whitespace]"
+	    output = 1  # Make the END block succeed.
+	    exit
+	} else if (ARGV[ARGB] ~ /^--non-whitespace|-w$/) {
+	    delete ARGV[ARGB++]
+	    isNonWhitespace = 1
+	} else if (ARGV[ARGB] == "--status") {
+	    delete ARGV[ARGB++]
+	    errorStatus = ARGV[ARGB]
+	    delete ARGV[ARGB++]
+	} else {
+	    break
+	}
     }
 }
 
@@ -23,4 +33,4 @@ BEGIN {
 
 isNonWhitespace && /\S/ { output = 1; }
 
-END { if (! output) exit 1; }
+END { if (! output) exit errorStatus; }
