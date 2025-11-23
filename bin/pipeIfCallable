@@ -6,7 +6,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, they can
     # skim the long one.
-    printf 'Usage: cat FILE [...] | %q %s\n' "$(basename "$1")" "[-o|--or SIMPLECOMMAND [...] ${PIPEIFCALLABLE_OR_END} [-o ...]] [--or-suppress|-s|--or-stderr|-S] [--] SIMPLECOMMAND [...] [-?|-h|--help]"
+    printf 'Usage: cat FILE [...] | %q %s\n' "$(basename "$1")" "[-o|--or-command ALT-CMDLINE [-o ...] | -O|--or-exec ALT-SIMPLECOMMAND [...] ${PIPEIFCALLABLE_OR_END} [-O ...]] [-s|--or-suppress|-S|--or-stderr] [--] -c|--command CMDLINE | SIMPLECOMMAND [...] [-?|-h|--help]"
 }
 printUsage()
 {
@@ -27,9 +27,12 @@ HELPDESCRIPTION
     printShortUsage "$1"
     echo
     cat <<HELPTEXT
-    --or|-o CMD [...] ${PIPEIFCALLABLE_OR_END}	Execute CMD; all following arguments are taken to be
-			arguments to the CMD until an argument consisting of
-			'${PIPEIFCALLABLE_OR_END}' is encountered.
+    --or-command|-o ALT-CMDLINE
+			Execute ALT-CMDLINE if COMMAND isn't callable.
+    --or-exec|-O CMD [...] ${PIPEIFCALLABLE_OR_END}
+			Execute CMD if COMMAND isn't callable; all following
+			arguments are taken to be arguments to the CMD until an
+			argument consisting of '${PIPEIFCALLABLE_OR_END}' is encountered.
     --or-suppress|-s	If no COMMAND is callable, suppress the input instead of
 			printing it to stdout.
     --or-stderr|-S	If no COMMAND is callable, pass the input to standard
@@ -43,7 +46,17 @@ while [ $# -ne 0 ]
 do
     case "$1" in
 	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
-	--or|-o)	shift
+	--or-command|-o)
+			shift
+			if [ -z "$commands" ] \
+			    && commandName="$(commandName --eval --undefined '' -- "${1:?}")" || exit 5 \
+			    && type -t -- "$commandName" >/dev/null
+			then
+			    commands="$1"
+			fi
+			shift
+			;;
+	--or-exec|-O)	shift
 			naiveCommandName="$1"
 			typeset -a currentCommand="$1"
 			cmd=
@@ -55,7 +68,7 @@ do
 			    shift
 			done
 			if [ $# -eq 0 ]; then
-			    echo "ERROR: --or|-o command must be concluded with '${PIPEIFCALLABLE_OR_END}'"; echo; printUsage "$0"
+			    echo "ERROR: --or-exec command must be concluded with '${PIPEIFCALLABLE_OR_END}'"; echo; printUsage "$0"
 			    exit 2
 			fi >&2
 			shift
