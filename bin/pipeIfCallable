@@ -1,0 +1,84 @@
+#!/bin/bash
+
+: ${PIPEIFCALLABLE_OR_END=;}
+
+printShortUsage()
+{
+    # Note: short followed by long option; if the user knows the short one, they can
+    # skim the long one.
+    printf 'Usage: cat FILE [...] | %q %s\n' "$(basename "$1")" "[-o|--or SIMPLECOMMAND [...] ${PIPEIFCALLABLE_OR_END} [-o ...]] [--or-suppress|-s|--or-stderr|-S] [--] SIMPLECOMMAND [...] [-?|-h|--help]"
+}
+printUsage()
+{
+    # This is the short help when launched with no or incorrect arguments.
+    # It is printed to stderr to avoid accidental processing.
+    printShortUsage "$1" >&2
+    printf >&2 '\nTry %q --help for more information.\n' "$(basename "$1")"
+}
+printLongUsage()
+{
+    # This is the long "man page" when launched with the help argument.
+    # It is printed to stdout to allow paging with 'more'.
+    cat <<HELPDESCRIPTION
+If COMMAND is callable, pass the input into it, else pass the input into the
+first ALT-COMMAND that is callable, or simply to standard output.
+HELPDESCRIPTION
+    echo
+    printShortUsage "$1"
+    echo
+    cat <<HELPTEXT
+    --or|-o CMD [...] ${PIPEIFCALLABLE_OR_END}	Execute CMD; all following arguments are taken to be
+			arguments to the CMD until an argument consisting of
+			'${PIPEIFCALLABLE_OR_END}' is encountered.
+    --or-suppress|-s	If no COMMAND is callable, suppress the input instead of
+			printing it to stdout.
+    --or-stderr|-S	If no COMMAND is callable, pass the input to standard
+			error.
+HELPTEXT
+}
+
+commands=
+fallbackCommand='exec cat'
+while [ $# -ne 0 ]
+do
+    case "$1" in
+	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
+	--or|-o)	shift
+			commandName="$1"
+			cmd=
+			while [ $# -gt 0 -a "$1" != "$PIPEIFCALLABLE_OR_END" ]
+			do
+			    printf -v quotedArg %q "$1"
+			    cmd+="${cmd:+ }${quotedArg}"
+			    shift
+			done
+			if [ $# -eq 0 ]; then
+			    echo "ERROR: --or|-o command must be concluded with '${PIPEIFCALLABLE_OR_END}'"; echo; printUsage "$0"
+			    exit 2
+			fi >&2
+			shift
+			if [ -z "$commands" ] && type -t "$commandName" >/dev/null; then
+			    commands="$cmd"
+			fi
+			;;
+	--or-suppress|-s)
+			shift; fallbackCommand='exec cat >/dev/null 2>&1';;
+	--or-stderr|-S)
+			shift; fallbackCommand='exec cat >&2';;
+	--)		shift; break;;
+	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
+	*)		break;;
+    esac
+done
+if [ $# -eq 0 ]; then
+    echo 'ERROR: No SIMPLECOMMAND passed.'
+    echo
+    printUsage "$0"
+    exit 2
+fi >&2
+if type -t "$1" >/dev/null; then
+    printf -v quotedSimpleCommand '%q ' "$@"
+    commands="${quotedSimpleCommand% }"
+fi
+
+eval "${commands:-$fallbackCommand}"
