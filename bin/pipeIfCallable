@@ -1,5 +1,6 @@
 #!/bin/bash
 
+: ${PIPEIFCALLABLE_NO_COMMAND_STATUS:=99}
 : ${PIPEIFCALLABLE_OR_END=;}
 
 printShortUsage()
@@ -37,11 +38,16 @@ HELPDESCRIPTION
 			printing it to stdout.
     --or-stderr|-S	If no COMMAND is callable, pass the input to standard
 			error.
+EXIT STATUS:
+    0	Complete success.
+    2	Bad invocation, wrong or missing command-line arguments.
+    $PIPEIFCALLABLE_NO_COMMAND_STATUS	If no COMMAND is callable.
+    *   any exit status from COMMAND(s)
 HELPTEXT
 }
 
 commands=
-fallbackCommand='exec cat'
+fallbackCommand='cat; exit $PIPEIFCALLABLE_NO_COMMAND_STATUS'
 while [ $# -ne 0 ]
 do
     case "$1" in
@@ -80,9 +86,9 @@ do
 			fi
 			;;
 	--or-suppress|-s)
-			shift; fallbackCommand='exec cat >/dev/null 2>&1';;
+			shift; fallbackCommand='cat >/dev/null 2>&1; exit $PIPEIFCALLABLE_NO_COMMAND_STATUS';;
 	--or-stderr|-S)
-			shift; fallbackCommand='exec cat >&2';;
+			shift; fallbackCommand='cat >&2; exit $PIPEIFCALLABLE_NO_COMMAND_STATUS';;
 	--)		shift; break;;
 	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
 	*)		break;;
