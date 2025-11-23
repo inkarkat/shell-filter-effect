@@ -44,12 +44,14 @@ do
     case "$1" in
 	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
 	--or|-o)	shift
-			commandName="$1"
+			naiveCommandName="$1"
+			typeset -a currentCommand="$1"
 			cmd=
 			while [ $# -gt 0 -a "$1" != "$PIPEIFCALLABLE_OR_END" ]
 			do
 			    printf -v quotedArg %q "$1"
 			    cmd+="${cmd:+ }${quotedArg}"
+			    currentCommand+=("$1")
 			    shift
 			done
 			if [ $# -eq 0 ]; then
@@ -57,7 +59,10 @@ do
 			    exit 2
 			fi >&2
 			shift
-			if [ -z "$commands" ] && type -t "$commandName" >/dev/null; then
+			if [ -z "$commands" ] \
+			    && commandName="$(commandName --undefined '' -- "${currentCommand[@]}" 2>/dev/null || printf %s "$naiveCommandName")" \
+			    && type -t -- "$commandName" >/dev/null
+			then
 			    commands="$cmd"
 			fi
 			;;
@@ -76,7 +81,9 @@ if [ $# -eq 0 ]; then
     printUsage "$0"
     exit 2
 fi >&2
-if type -t "$1" >/dev/null; then
+if commandName="$(commandName --undefined '' -- "$@" 2>/dev/null || printf %s "$1")" \
+    && type -t -- "$commandName" >/dev/null
+then
     printf -v quotedSimpleCommand '%q ' "$@"
     commands="${quotedSimpleCommand% }"
 fi
