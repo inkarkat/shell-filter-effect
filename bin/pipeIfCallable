@@ -38,6 +38,10 @@ HELPDESCRIPTION
 			printing it to stdout.
     --or-stderr|-S	If no COMMAND is callable, pass the input to standard
 			error.
+SEE ALSO:
+- runFirstCallableCommand executes the first callable command (and ignores any
+  input).
+
 EXIT STATUS:
     0	Complete success.
     2	Bad invocation, wrong or missing command-line arguments.
