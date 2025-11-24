@@ -1,13 +1,13 @@
 #!/bin/bash
 
 : ${OUTPUTAND_COMMAND_JOINER=;}
-: ${OUTPUTAND_OR_END=;}
+: ${OUTPUTAND_EXEC_END=;}
 
 printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: cat FILE [...] | %q %s\n' "$(basename "$1")" "[-w|--non-whitespace] [-b|--before|-B|--before-command BEFORE-COMMANDLINE [...]] [-o|--or-command \"NOOUT-COMMANDLINE\" [-o ...] | -O|--or-exec NOOUT-SIMPLECOMMAND [...] ${OUTPUTAND_OR_END} [-O ...]] -c|--command \"COMMANDLINE\" [-c ...] | [--] SIMPLECOMMAND [...] [-?|-h|--help]"
+    printf 'Usage: cat FILE [...] | %q %s\n' "$(basename "$1")" "[-w|--non-whitespace] [-b|--before|-B|--before-command BEFORE-COMMANDLINE [...]] [-o|--or-command \"NOOUT-COMMANDLINE\" [-o ...] | -O|--or-exec NOOUT-SIMPLECOMMAND [...] ${OUTPUTAND_EXEC_END} [-O ...]] -c|--command \"COMMANDLINE\" [-c ...] | --exec SIMPLECOMMAND [...] ${OUTPUTAND_EXEC_END} [--exec ...] | [--] SIMPLECOMMAND [...] [-?|-h|--help]"
 }
 printUsage()
 {
@@ -38,11 +38,11 @@ HELPDESCRIPTION
 			    has occurred. With this, you can handle both
 			    outcomes; i.e. either this or COMMAND(s) will be
 			    executed, never both.
-    --or-exec|-O NOOUT-SIMPLECOMMAND [...] ${OUTPUTAND_OR_END}
+    --or-exec|-O NOOUT-SIMPLECOMMAND [...] ${OUTPUTAND_EXEC_END}
 			    Execute NOOUT-SIMPLECOMMAND if no (accepted) output
 			    has occurred; all following arguments are taken to
 			    be arguments to the NOOUT-SIMPLECOMMAND until an
-			    argument consisting of '${OUTPUTAND_OR_END}' is encountered.
+			    argument consisting of '${OUTPUTAND_EXEC_END}' is encountered.
 EXIT STATUS:
     0	Output occurred, and COMMAND(s) executed successfully.
     1	No output has been piped into the command (and NOOUT-COMMANDLINE
@@ -87,6 +87,21 @@ do
 				noOutputCommands+="${noOutputCommands:+ $OUTPUTAND_COMMAND_JOINER }${cmd}"
 				;;
 	--command|-c)		shift; commands+="${commands:+ $OUTPUTAND_COMMAND_JOINER }$1"; shift;;
+	--exec)			shift
+				cmd=
+				while [ $# -gt 0 -a "$1" != "$OUTPUTAND_EXEC_END" ]
+				do
+				    printf -v quotedArg %q "$1"
+				    cmd+="${cmd:+ }${quotedArg}"
+				    shift
+				done
+				if [ $# -eq 0 ]; then
+				    echo "ERROR: --exec command must be concluded with '${OUTPUTAND_EXEC_END}'"; echo; printUsage "$0"
+				    exit 2
+				fi >&2
+				shift
+				commands+="${commands:+ $OUTPUTAND_COMMAND_JOINER }${cmd}"
+				;;
 	--)			shift; break;;
 	-*)			{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
 	*)			break;;
@@ -99,7 +114,7 @@ if [ $# -ne 0 ]; then
     commands+="${commands:+ $OUTPUTAND_COMMAND_JOINER }${quotedSimpleCommand% }"
 fi
 if [ -z "$commands" ]; then
-    echo >&2 'ERROR: No COMMAND(s) specified; need to pass -c|--command "COMMANDLINE", or SIMPLECOMMAND.'
+    echo >&2 "ERROR: No COMMAND(s) specified; need to pass -c|--command \"COMMANDLINE\", or --exec SIMPLECOMMAND [...] $OUTPUTAND_EXEC_END or SIMPLECOMMAND."
     exit 2
 fi
 
