@@ -1,0 +1,114 @@
+#!/bin/bash
+
+: ${PIPEIFCALLABLE_NO_COMMAND_STATUS:=99}
+: ${PIPEIFCALLABLE_OR_END=;}
+
+printShortUsage()
+{
+    # Note: short followed by long option; if the user knows the short one, they can
+    # skim the long one.
+    printf 'Usage: cat FILE [...] | %q %s\n' "$(basename "$1")" "[-o|--or-command ALT-CMDLINE [-o ...] | -O|--or-exec ALT-SIMPLECOMMAND [...] ${PIPEIFCALLABLE_OR_END} [-O ...]] [-s|--or-suppress|-S|--or-stderr] [--] -c|--command CMDLINE | SIMPLECOMMAND [...] [-?|-h|--help]"
+}
+printUsage()
+{
+    # This is the short help when launched with no or incorrect arguments.
+    # It is printed to stderr to avoid accidental processing.
+    printShortUsage "$1" >&2
+    printf >&2 '\nTry %q --help for more information.\n' "$(basename "$1")"
+}
+printLongUsage()
+{
+    # This is the long "man page" when launched with the help argument.
+    # It is printed to stdout to allow paging with 'more'.
+    cat <<HELPDESCRIPTION
+If COMMAND is callable, pass the input into it, else pass the input into the
+first ALT-COMMAND that is callable, or simply to standard output.
+HELPDESCRIPTION
+    echo
+    printShortUsage "$1"
+    echo
+    cat <<HELPTEXT
+    --or-command|-o ALT-CMDLINE
+			Execute ALT-CMDLINE if COMMAND isn't callable.
+    --or-exec|-O CMD [...] ${PIPEIFCALLABLE_OR_END}
+			Execute CMD if COMMAND isn't callable; all following
+			arguments are taken to be arguments to the CMD until an
+			argument consisting of '${PIPEIFCALLABLE_OR_END}' is encountered.
+    --or-suppress|-s	If no COMMAND is callable, suppress the input instead of
+			printing it to stdout.
+    --or-stderr|-S	If no COMMAND is callable, pass the input to standard
+			error.
+SEE ALSO:
+- runFirstCallableCommand executes the first callable command (and ignores any
+  input).
+
+EXIT STATUS:
+    0	Complete success.
+    2	Bad invocation, wrong or missing command-line arguments.
+    $PIPEIFCALLABLE_NO_COMMAND_STATUS	If no COMMAND is callable.
+    *   any exit status from COMMAND(s)
+HELPTEXT
+}
+
+commands=
+fallbackCommand='cat; exit $PIPEIFCALLABLE_NO_COMMAND_STATUS'
+while [ $# -ne 0 ]
+do
+    case "$1" in
+	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
+	--or-command|-o)
+			shift
+			if [ -z "$commands" ] \
+			    && commandName="$(commandName --eval --undefined '' -- "${1:?}")" || exit 5 \
+			    && type -t -- "$commandName" >/dev/null
+			then
+			    commands="$1"
+			fi
+			shift
+			;;
+	--or-exec|-O)	shift
+			naiveCommandName="$1"
+			typeset -a currentCommand="$1"
+			cmd=
+			while [ $# -gt 0 -a "$1" != "$PIPEIFCALLABLE_OR_END" ]
+			do
+			    printf -v quotedArg %q "$1"
+			    cmd+="${cmd:+ }${quotedArg}"
+			    currentCommand+=("$1")
+			    shift
+			done
+			if [ $# -eq 0 ]; then
+			    echo "ERROR: --or-exec command must be concluded with '${PIPEIFCALLABLE_OR_END}'"; echo; printUsage "$0"
+			    exit 2
+			fi >&2
+			shift
+			if [ -z "$commands" ] \
+			    && commandName="$(commandName --undefined '' -- "${currentCommand[@]}" 2>/dev/null || printf %s "$naiveCommandName")" \
+			    && type -t -- "$commandName" >/dev/null
+			then
+			    commands="$cmd"
+			fi
+			;;
+	--or-suppress|-s)
+			shift; fallbackCommand='cat >/dev/null 2>&1; exit $PIPEIFCALLABLE_NO_COMMAND_STATUS';;
+	--or-stderr|-S)
+			shift; fallbackCommand='cat >&2; exit $PIPEIFCALLABLE_NO_COMMAND_STATUS';;
+	--)		shift; break;;
+	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
+	*)		break;;
+    esac
+done
+if [ $# -eq 0 ]; then
+    echo 'ERROR: No SIMPLECOMMAND passed.'
+    echo
+    printUsage "$0"
+    exit 2
+fi >&2
+if commandName="$(commandName --undefined '' -- "$@" 2>/dev/null || printf %s "$1")" \
+    && type -t -- "$commandName" >/dev/null
+then
+    printf -v quotedSimpleCommand '%q ' "$@"
+    commands="${quotedSimpleCommand% }"
+fi
+
+eval "${commands:-$fallbackCommand}"
