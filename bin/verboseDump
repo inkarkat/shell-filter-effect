@@ -110,7 +110,7 @@ if [ "$outputMessage" ]; then
 fi
 if [ "$emptyMessage" ]; then
     printf -v quotedEmptyMessage '%q' "$emptyMessage"
-    outputAndArgs+=(--or "printf %s\\\\n $quotedEmptyMessage >> $quotedSink")
+    outputAndArgs+=(--or-command "printf %s\\\\n $quotedEmptyMessage >> $quotedSink")
 fi
 
 eval "${isSponge:+sponge |}${outputAndArgs:+outputAnd}" '"${outputAndArgs[@]}"' "${outputAndArgs:+|} ${filterTeeArgs:+filter}tee" '"${filterTeeArgs[@]}" --append "$VERBOSEDUMP_SINK"'
