@@ -1,0 +1,85 @@
+#!/bin/bash
+
+: ${OUTPUTOR_COMMAND_JOINER=;}
+: ${OUTPUTOR_EXEC_END=;}
+
+printShortUsage()
+{
+    # Note: short followed by long option; if the user knows the short one, she can
+    # skim the long one.
+    printf 'Usage: cat FILE [...] | %q %s\n' "$(basename "$1")" "[-w|--non-whitespace] -c|--command \"COMMANDLINE\" [-c ...] | --exec SIMPLECOMMAND [...] ${OUTPUTOR_EXEC_END} [--exec ...] | [--] SIMPLECOMMAND [...] [-?|-h|--help]"
+}
+printUsage()
+{
+    # This is the short help when launched with no or incorrect arguments.
+    # It is printed to stderr to avoid accidental processing.
+    printShortUsage "$1" >&2
+    printf >&2 '\nTry %q --help for more information.\n' "$(basename "$1")"
+}
+printLongUsage()
+{
+    # This is the long "man page" when launched with the help argument.
+    # It is printed to stdout to allow paging with 'more'.
+    cat <<HELPDESCRIPTION
+If output is piped into the command, it is passed through as-is.
+If there's no output, execute COMMAND(s).
+HELPDESCRIPTION
+    echo
+    printShortUsage "$1"
+    cat <<HELPTEXT
+    --non-whitespace|-w	    Output needs to contain at least one non-whitespace
+			    character to be accepted.
+EXIT STATUS:
+    0	Output occurred.
+    2	Bad invocation, wrong or missing command-line arguments.
+    *   any exit status from COMMAND(s)
+
+SEE ALSO:
+- outputAnd has inverse logic, but also (but not exclusively) allows command
+  execution on no output via --or-{command,exec}.
+- outputOrPrintf is a specialization for printing text if no output.
+- outputOrError just fails if no output.
+HELPTEXT
+}
+
+commands=
+commands=
+tester=outputOrError
+while [ $# -ne 0 ]
+do
+    case "$1" in
+	--help|-h|-\?)		shift; printLongUsage "$0"; exit 0;;
+	--non-whitespace|-w)	shift; tester=nonWhitespaceOutputOrError;;
+	--command|-c)		shift; commands+="${commands:+ $OUTPUTOR_COMMAND_JOINER }$1"; shift;;
+	--exec)			shift
+				cmd=
+				while [ $# -gt 0 -a "$1" != "$OUTPUTOR_EXEC_END" ]
+				do
+				    printf -v quotedArg %q "$1"
+				    cmd+="${cmd:+ }${quotedArg}"
+				    shift
+				done
+				if [ $# -eq 0 ]; then
+				    echo "ERROR: --exec command must be concluded with '${OUTPUTOR_EXEC_END}'"; echo; printUsage "$0"
+				    exit 2
+				fi >&2
+				shift
+				commands+="${commands:+ $OUTPUTOR_COMMAND_JOINER }${cmd}"
+				;;
+	--)			shift; break;;
+	-*)			{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
+	*)			break;;
+    esac
+done
+if [ $# -ne 0 ]; then
+    # Combine --command and SIMPLECOMMAND; need to quote SIMPLECOMMAND to
+    # undo the effects of eval.
+    printf -v quotedSimpleCommand '%q ' "$@"
+    commands+="${commands:+ $OUTPUTOR_COMMAND_JOINER }${quotedSimpleCommand% }"
+fi
+if [ -z "$commands" ]; then
+    echo >&2 "ERROR: No COMMAND(s) specified; need to pass -c|--command \"COMMANDLINE\", or --exec SIMPLECOMMAND [...] $OUTPUTOR_EXEC_END or SIMPLECOMMAND."
+    exit 2
+fi
+
+$tester || eval "$commands"

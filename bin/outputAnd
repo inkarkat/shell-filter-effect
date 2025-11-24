@@ -52,8 +52,10 @@ EXIT STATUS:
     126	NOOUT-COMMANDLINE has failed.
 
 SEE ALSO:
-Use ifne if you want to execute COMMAND(s) when output is available and have
-COMMAND(s) consume that output (instead of printing it beforehand).
+- Use ifne if you want to execute COMMAND(s) when output is available and have
+  COMMAND(s) consume that output (instead of printing it beforehand).
+- outputOr has inverse logic, allowing the --or-{command,exec} parts without a
+  positive command on output.
 HELPTEXT
 }
 

@@ -11,6 +11,10 @@ BEGIN {
 	    print ""
 	    print "Usage: outputOrError [-w|--non-whitespace] [--status N] FILE [...] [-?|-H|--man|--usage]"
 	    print "Usage: cat FILE [...] | outputOrError [-w|--non-whitespace]"
+	    print ""
+	    print "SEE ALSO:"
+	    print "- outputOr is a generalization that can directly execute shell commands if no"
+	    print "  output."
 	    output = 1  # Make the END block succeed.
 	    exit
 	} else if (ARGV[ARGB] ~ /^--non-whitespace|-w$/) {
