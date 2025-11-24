@@ -6,7 +6,7 @@ printUsage()
 If output is piped into the command, it is passed through as-is.
 If there's no output (with -w|--non-whitespace: output that does not contain at
 least one non-whitespace character), printf FORMAT [ARGUMENTS ...] to standard
-error and exit with 1.
+error and exit with 1 / N.
 HELPTEXT
     printf 'Usage: cat FILE [...] | %q %s\n' "$(basename "$1")" '[-w|--non-whitespace] [--status N] [--] FORMAT [ARGUMENTS ...] [-?|-h|--help]'
 }

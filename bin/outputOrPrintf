@@ -6,12 +6,13 @@ printUsage()
 If output is piped into the command, it is passed through as-is.
 If there's no output (with -w|--non-whitespace: output that does not contain at
 least one non-whitespace character), printf FORMAT [ARGUMENTS ...] instead (with
--2|--stderr: to standard error).
+-2|--stderr: to standard error) and exit with 0 / N.
 HELPTEXT
-    printf 'Usage: cat FILE [...] | %q %s\n' "$(basename "$1")" '[-w|--non-whitespace] [-2|--stderr] [--] FORMAT [ARGUMENTS ...] [-?|-h|--help]'
+    printf 'Usage: cat FILE [...] | %q %s\n' "$(basename "$1")" '[-w|--non-whitespace] [-2|--stderr] [--status N] [--] FORMAT [ARGUMENTS ...] [-?|-h|--help]'
 }
 
 redir=
+noOutputStatus=1
 tester=outputOrError
 while [ $# -ne 0 ]
 do
@@ -19,6 +20,7 @@ do
 	--help|-h|-\?)	shift; printUsage "$0"; exit 0;;
 	--non-whitespace|-w)	shift; tester=nonWhitespaceOutputOrError;;
 	--stderr|-2)		shift; redir='>&2';;
+	--status)	shift; noOutputStatus="${1:?}"; shift;;
 	--)		shift; break;;
 	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
 	*)		break;;
@@ -29,4 +31,6 @@ if [ $# -eq 0 ]; then
     exit 2
 fi
 
-eval "$tester || printf $redir" '"$@"'
+$tester && exit 0
+eval "printf $redir" '"$@"'
+exit $noOutputStatus
