@@ -1,13 +1,13 @@
 #!/bin/bash
 
 : ${PIPEIFCALLABLE_NO_COMMAND_STATUS:=99}
-: ${PIPEIFCALLABLE_OR_END=;}
+: ${PIPEIFCALLABLE_EXEC_END=;}
 
 printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, they can
     # skim the long one.
-    printf 'Usage: cat FILE [...] | %q %s\n' "$(basename "$1")" "[-o|--or-command ALT-CMDLINE [-o ...] | -O|--or-exec ALT-SIMPLECOMMAND [...] ${PIPEIFCALLABLE_OR_END} [-O ...]] [-s|--or-suppress|-S|--or-stderr] [--] -c|--command CMDLINE | SIMPLECOMMAND [...] [-?|-h|--help]"
+    printf 'Usage: cat FILE [...] | %q %s\n' "$(basename "$1")" "[-o|--or-command ALT-CMDLINE [-o ...] | -O|--or-exec ALT-SIMPLECOMMAND [...] ${PIPEIFCALLABLE_EXEC_END} [-O ...]] [-s|--or-suppress|-S|--or-stderr] [--] -c|--command CMDLINE | SIMPLECOMMAND [...] [-?|-h|--help]"
 }
 printUsage()
 {
@@ -30,10 +30,10 @@ HELPDESCRIPTION
     cat <<HELPTEXT
     --or-command|-o ALT-CMDLINE
 			Execute ALT-CMDLINE if COMMAND isn't callable.
-    --or-exec|-O CMD [...] ${PIPEIFCALLABLE_OR_END}
+    --or-exec|-O CMD [...] ${PIPEIFCALLABLE_EXEC_END}
 			Execute CMD if COMMAND isn't callable; all following
 			arguments are taken to be arguments to the CMD until an
-			argument consisting of '${PIPEIFCALLABLE_OR_END}' is encountered.
+			argument consisting of '${PIPEIFCALLABLE_EXEC_END}' is encountered.
     --or-suppress|-s	If no COMMAND is callable, suppress the input instead of
 			printing it to stdout.
     --or-stderr|-S	If no COMMAND is callable, pass the input to standard
@@ -70,7 +70,7 @@ do
 			naiveCommandName="$1"
 			typeset -a currentCommand="$1"
 			cmd=
-			while [ $# -gt 0 -a "$1" != "$PIPEIFCALLABLE_OR_END" ]
+			while [ $# -gt 0 -a "$1" != "$PIPEIFCALLABLE_EXEC_END" ]
 			do
 			    printf -v quotedArg %q "$1"
 			    cmd+="${cmd:+ }${quotedArg}"
@@ -78,7 +78,7 @@ do
 			    shift
 			done
 			if [ $# -eq 0 ]; then
-			    echo "ERROR: --or-exec command must be concluded with '${PIPEIFCALLABLE_OR_END}'"; echo; printUsage "$0"
+			    echo "ERROR: --or-exec command must be concluded with '${PIPEIFCALLABLE_EXEC_END}'"; echo; printUsage "$0"
 			    exit 2
 			fi >&2
 			shift
