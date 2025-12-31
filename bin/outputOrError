@@ -35,7 +35,7 @@ BEGIN {
 { printf("%s%s", $0, RT); }
 
 ! isNonWhitespace { if ($0 != "") output = 1; }
-! isNonWhitespace && 2 { output = 1; }
+! isNonWhitespace && NR == 2 { output = 1; }
 
 isNonWhitespace && /\S/ { output = 1; }
 
