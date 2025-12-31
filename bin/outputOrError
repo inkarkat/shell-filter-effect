@@ -10,7 +10,7 @@ BEGIN {
 	    print "least one non-whitespace character), exit with 1 / N."
 	    print ""
 	    print "Usage: outputOrError [-w|--non-whitespace] [--status N] FILE [...] [-?|-H|--man|--usage]"
-	    print "Usage: cat FILE [...] | outputOrError [-w|--non-whitespace]"
+	    print "Usage: cat FILE [...] | outputOrError [-w|--non-whitespace] [--status N]"
 	    print ""
 	    print "SEE ALSO:"
 	    print "- outputOr is a generalization that can directly execute shell commands if no"

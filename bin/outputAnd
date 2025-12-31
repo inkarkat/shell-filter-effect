@@ -61,7 +61,7 @@ HELPTEXT
 
 commands=
 noOutputCommands=
-tester=outputOrError
+typeset -a outputOrErrorArgs=()
 isNonWhitespace=
 isBefore=
 beforeCommands=
@@ -69,7 +69,7 @@ while [ $# -ne 0 ]
 do
     case "$1" in
 	--help|-h|-\?)		shift; printLongUsage "$0"; exit 0;;
-	--non-whitespace|-w)	shift; isNonWhitespace=t; tester=nonWhitespaceOutputOrError;;
+	--non-whitespace|-w)	outputOrErrorArgs+=("$1"); shift;;
 	--before|-b)		shift; isBefore=t;;
 	--before-command|-B)	shift; beforeCommands+="${beforeCommands:+ $OUTPUTAND_COMMAND_JOINER }$1"; shift;;
 	--or-command|-o)	shift; noOutputCommands+="${noOutputCommands:+ $OUTPUTAND_COMMAND_JOINER }$1"; shift;;
@@ -164,7 +164,7 @@ if [ "$isBefore" ] || [ -n "$beforeCommands" ]; then
     fi
     [ $status -ne 0 -o -z "$beforeCommands" -o -z "$commands" ] || runCommands || status=125
 else
-    if $tester; then
+    if outputOrError "${outputOrErrorArgs[@]}"; then
 	status=0
 	runCommands || status=125
     fi
