@@ -6,11 +6,13 @@ BEGIN {
     while (1) {
 	if (ARGV[ARGB] ~ /^(--(help|man|usage)|-[Hh?])$/) {
 	    print "If output is piped into the command, it is passed through as-is."
-	    print "If there's no output (with -w|--non-whitespace: output that does not contain at"
-	    print "least one non-whitespace character), exit with 1 / N."
+	    print "If there's no output, exit with 1 / N."
 	    print ""
 	    print "Usage: outputOrError [-w|--non-whitespace] [--status N] FILE [...] [-?|-H|--man|--usage]"
 	    print "Usage: cat FILE [...] | outputOrError [-w|--non-whitespace] [--status N]"
+	    print ""
+	    print "    --non-whitespace|-w	Fail if output just consists of whitespace."
+	    print "    --status N		Fail with N instead of 1."
 	    print ""
 	    print "SEE ALSO:"
 	    print "- outputOr is a generalization that can directly execute shell commands if no"
