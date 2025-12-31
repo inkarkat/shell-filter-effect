@@ -7,7 +7,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: cat FILE [...] | %q %s\n' "$(basename "$1")" "[-w|--non-whitespace] -c|--command \"COMMANDLINE\" [-c ...] | --exec SIMPLECOMMAND [...] ${OUTPUTOR_EXEC_END} [--exec ...] | [--] SIMPLECOMMAND [...] [-?|-h|--help]"
+    printf 'Usage: cat FILE [...] | %q %s\n' "$(basename "$1")" "[-w|--non-whitespace] [-m|--multiline] -c|--command \"COMMANDLINE\" [-c ...] | --exec SIMPLECOMMAND [...] ${OUTPUTOR_EXEC_END} [--exec ...] | [--] SIMPLECOMMAND [...] [-?|-h|--help]"
 }
 printUsage()
 {
@@ -29,6 +29,8 @@ HELPDESCRIPTION
     cat <<HELPTEXT
     --non-whitespace|-w	    Output needs to contain at least one non-whitespace
 			    character to be accepted.
+    --multiline|-m	    Output needs to consist of more than one line to be
+			    accepted.
 EXIT STATUS:
     0	Output occurred.
     2	Bad invocation, wrong or missing command-line arguments.
@@ -43,13 +45,13 @@ HELPTEXT
 }
 
 commands=
-commands=
 typeset -a outputOrErrorArgs=()
 while [ $# -ne 0 ]
 do
     case "$1" in
 	--help|-h|-\?)		shift; printLongUsage "$0"; exit 0;;
-	--non-whitespace|-w)	outputOrErrorArgs+=("$1"); shift;;
+	--non-whitespace|-w|--multiline|-m)
+				outputOrErrorArgs+=("$1"); shift;;
 	--command|-c)		shift; commands+="${commands:+ $OUTPUTOR_COMMAND_JOINER }$1"; shift;;
 	--exec)			shift
 				cmd=
