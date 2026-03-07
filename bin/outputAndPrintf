@@ -27,7 +27,7 @@ HELPDESCRIPTION
     --non-whitespace|-w	    Output needs to contain at least one non-whitespace
 			    character to print something.
     --stderr|-2		    Print to standard error instead of standard out.
-    -o|--output FILESPEC|&N Append to FILESPEC / file descriptor N.
+    --output|-o FILESPEC|&N Append to FILESPEC / file descriptor N.
     --append|-a		    Print after the output, not before it.
 
 SEE ALSO:
