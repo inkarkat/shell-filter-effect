@@ -7,7 +7,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: cat FILE [...] | %q %s\n' "$(basename "$1")" '[-i|--interval INTERVAL[SUFFIX][ADJUSTMENT] [-I|--initial-interval INTERVAL[SUFFIX]]|-M|--immediate] [-l|--line-interval LINE-NUM] [-w|--non-whitespace] [-b|--before|-a|--append|-p|--piped] [-s|--skip PATTERN [...]] [-m|--match PATTERN [...]] [-n|--count N|-1|--once] -c|--command "COMMANDLINE" [-c ...] | [--] SIMPLECOMMAND [...] [-?|-h|--help]'
+    printf 'Usage: cat FILE [...] | %q %s\n' "$(basename "$1")" '[-i|--interval INTERVAL[ADJUSTMENT] [-I|--initial-interval INTERVAL]|-M|--immediate] [-l|--line-interval LINE-NUM] [-w|--non-whitespace] [-b|--before|-a|--append|-p|--piped] [-s|--skip PATTERN [...]] [-m|--match PATTERN [...]] [-n|--count N|-1|--once] -c|--command "COMMANDLINE" [-c ...] | [--] SIMPLECOMMAND [...] [-?|-h|--help]'
 }
 printUsage()
 {
@@ -22,127 +22,49 @@ printLongUsage()
     # It is printed to stdout to allow paging with 'more'.
     cat <<HELPDESCRIPTION
 Whenever there is output (but at least INTERVAL (default: 1 second) or LINE-NUM
-apart), execute the shell COMMANDS. If these fail, further processing is
+apart), execute the shell COMMAND(s). If these fail, further processing is
 aborted.
 HELPDESCRIPTION
     echo
     printShortUsage "$1"
+    echo
+    local -r timespanFormat="$(durationToSeconds --get-short-usage format 2>/dev/null || echo INTERVAL)"
+    durationWithAdjustmentToSeconds --get-long-usage '--interval|-i' "Wait for INTERVAL seconds between executions of
+			COMMAND(s), even if there's continuous output."
     cat <<HELPTEXT
-    --interval|-i INTERVAL[SUFFIX][ADJUSTMENT]
-			    Wait for INTERVAL seconds between executions of
-			    COMMANDS, even if there's continuous output.
-			    SUFFIX may be 's' for seconds (the default), 'm' for
-			    minutes, 'h' for hours or 'd' for days.
-			    ADJUSTMENT can change the original value after every
-			    iteration. It starts with either + or -, followed by
-			    another INTERVAL, optionally followed by either
-			    SUFFIX or %.
-			    For example, 10m+30s starts with 10 minutes and then
-			    increases that by 30 seconds on every iteration.
-			    10-5% starts with 10 seconds and then continually
-			    decreases that by 5 percent.
-    --initial-interval|-I INTERVAL[SUFFIX]
-			    There must be output for at least INTERVAL seconds
-			    before first executing COMMANDS. By default, the
-			    first output immediately triggers COMMANDS.
-    --immediate|-M	    Directly execute COMMANDS for every (matching / not
-			    skipped) line; don't wait INTERVAL seconds.
+    --initial-interval|-I ${timespanFormat}
+			There must be output for at least INTERVAL seconds
+			before first executing COMMAND(s). By default, the first
+			output immediately triggers COMMAND(s).
+    --immediate|-M	Directly execute COMMAND(s) for every (matching / not
+			skipped) line; don't wait INTERVAL seconds.
     --line-interval|-l LINE-NUM
-			    Wait until LINE-NUM lines have been output before
-			    doing another execution of COMMANDS. If INTERVAL is
-			    also given, one or the other has to be met.
-    --non-whitespace|-w	    Only output that does contains at least one
-			    non-whitespace character triggers COMMANDS
-			    execution.
-    --before|-b		    Execute COMMANDS before the output is printed
-			    (instead of after it).
-    --append|-a		    Execute COMMANDS after the output, but instead of a
-			    concluding newline (so any line break has to come
-			    from COMMANDS itself).
-    --piped|-p		    Feed the output since the last invocation of
-			    COMMANDS or the last encountered skipped line to
-			    COMMANDS (which have to do any output themselves).
-    --skip|-s PATTERN	    Ignore (but still print) lines that match PATTERN,
-			    so that these don't trigger COMMANDS execution.
-    --match|-m PATTERN	    Only consider lines that match PATTERN for
-			    triggering COMMANDS execution; other lines (and
-			    those that also match --skip PATTERN) are ignored.
-    --count|-n N	    Stop reacting on new output after N executions of
-			    COMMAND.
-    --once|-1		    Only execute COMMAND once after the first
-			    observation of output.
+			Wait until LINE-NUM lines have been output before doing
+			another execution of COMMAND(s). If INTERVAL is also
+			given, one or the other has to be met.
+    --non-whitespace|-w	Only output that does contains at least one
+			non-whitespace character triggers COMMAND execution.
+    --before|-b		Execute COMMAND(s) before the output is printed (instead
+			of after it).
+    --append|-a		Execute COMMAND(s) after the output, without a
+			concluding newline (so any line break has to come from
+			COMMAND(s) itself).
+    --piped|-p		Feed the output since the last invocation of COMMAND(s)
+			or the last encountered skipped line to COMMAND(s)
+			(which has to do any output itself).
+    --skip|-s PATTERN	Ignore (but still print) lines that match PATTERN, so
+			that these don't trigger COMMAND execution.
+    --match|-m PATTERN	Only consider lines that match PATTERN for triggering
+			COMMAND execution; other lines (and those that also
+			match --skip PATTERN) are ignored.
+    --count|-n N	Stop reacting on new output after N executions of
+			COMMAND(s).
+    --once|-1		Only execute COMMAND(s) once after the first observation
+			of output.
 HELPTEXT
 }
 
-timeToSeconds()
-{
-    case "$1" in
-	*([0-9]).+([0-9]))
-	    echo >&2 "ERROR: Floating point interval is not supported here."
-	    exit 2
-	    ;;
-	+([0-9])?(s))   time="${1%s}";;
-	+([0-9])m)	time=$((${1%m} * 60));;
-	+([0-9])h)	time=$((${1%h} * 3600));;
-	+([0-9])d)	time=$((${1%d} * 86400));;
-	*)		 >&2 'ERROR: Illegal interval: %s\n' "$1"; exit 2;;
-    esac
-    printf %s "$time"
-}
-timeWithAdjustmentToSeconds()
-{
-    local adjustment="${1##+([0-9.])?([smhd])}"
-    # Use this if no floating point is supported.
-    #local adjustment="${1##+([0-9])?([smhd])}"
-    local time="${1:0:$((${#1} - ${#adjustment}))}"
-    if [ -z "$time" ]; then
-	printf >&2 'ERROR: Empty interval: %s\n' "$time"; exit 2;
-    fi
-    case "$adjustment" in
-	'')		    ;;
-	[+-]+([0-9])?(%))   ;;
-	++([0-9])[smhd])    adjustment="+$(timeToSeconds "${adjustment#+}" adjustment)" || return $?;;
-	-+([0-9])[smhd])    adjustment="-$(timeToSeconds "${adjustment#-}" adjustment)" || return $?;;
-	*)		    printf >&2 'ERROR: Illegal adjustment: %s\n' "$adjustment"; exit 2;;
-    esac
-    time="$(timeToSeconds "$time" "$2")" || exit $?
-    printf '%s\t%s\n' "$time" "$adjustment"
-}
-adjust()
-{
-    local var="${1?}"; shift
-    local adjustment="$1"; shift
-    eval "local value=\$$var"
-    local newValue
-    case "$adjustment" in
-	'')	    return;;
-	[+-]0?(%))  return;;
-	++([0-9]))  newValue="$((value + ${adjustment#+}))";;
-	-+([0-9]))  newValue="$((value - ${adjustment#-}))";;
-	[+-]+([0-9])%)
-		    # As Bash doesn't support floating point math yet, multiply
-		    # with 100, add the percentage change, and divide back and
-		    # round.
-		    # To avoid that the rounding truncates small changes and
-		    # therefore never lets the real value change, store the cent
-		    # value in a global variable, and re-use that instead.
-		    eval "local centValue=\$${var}CentValue"
-		    [ "$centValue" ] || centValue=$((value * 100))
-
-		    local change=$((${adjustment:1:-1} * value))
-		    [ "${adjustment:0:1}" = '+' ] && let centValue+=$change || let centValue-=$change
-		    newValue=$(((centValue + 50) / 100))
-
-		    eval "${var}CentValue=\$centValue"
-		    ;;
-	*)	    printf >&2 'ASSERT: Invalid adjustment: %s\n' "$adjustment"; exit 3;;
-    esac
-
-    [ $newValue -lt 0 ] && newValue=0
-    eval "$var=\$newValue"
-}
-
-interval=1
+interval=
 intervalAdjustment=
 initialDelay=0
 lineInterval=
@@ -157,9 +79,9 @@ while [ $# -ne 0 ]
 do
     case "$1" in
 	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
-	--interval|-i)		shift; < <(timeWithAdjustmentToSeconds "$1") IFS=$'\t' read -r interval intervalAdjustment || exit 2; shift;;
+	--interval|-i)		shift; < <(durationWithAdjustmentToSeconds --no-adjustment "${1:?}") IFS=$'\t' read -r interval intervalAdjustment || exit 2; shift;;
 	--immediate|-M)		shift; interval=0;;
-	--initial-interval|-I)	shift; initialDelay="$(timeToSeconds "$1")" || exit $?; shift;;
+	--initial-interval|-I)	shift; initialDelay=$(durationToSeconds -- "${1:?}") || { printf >&2 'ERROR: Illegal INTERVAL: %s\n' "$1"; exit 2; }; shift;;
 	--line-interval|-l)	shift; lineInterval="${1:?}"; shift;;
 	--non-whitespace|-w)	shift; isNonWhitespace=t;;
 	--before|-b)	shift
@@ -200,6 +122,7 @@ do
 	*)		break;;
     esac
 done
+[ -n "$lineInterval" ] || : ${interval:=1}
 : ${mode:=after}
 if [ $# -ne 0 ]; then
     # Combine --command and SIMPLECOMMAND; need to quote SIMPLECOMMAND to
@@ -213,6 +136,27 @@ if [ -z "$commands" ]; then
     printUsage "$0"
     exit 2
 fi >&2
+
+typeset -a ADJUSTER=()
+adjustInto()
+{
+    local -n resultRef="${1:?}"; shift
+    local input="${1:?}"; shift
+
+    [ ${#ADJUSTER[@]} -gt 0 ] \
+	|| coproc ADJUSTER { durationWithAdjustmentToSeconds; } # Start a coproc to adjust individual timespans and manage expiration; this is much more efficient than starting a new process for each timespan.
+
+    printf '%s\n' "$input" >&"${ADJUSTER[1]}"
+    IFS=$'\n' read -r -u "${ADJUSTER[0]}" resultRef \
+    || { printf >&2 'ASSERT: Adjustment succeeds: %s\n' "$input"; exit 3; }
+    case ",${DEBUG:-}," in *,onOutput:adjuster,*) printf >&2 '%sonOutput (adjuster): %s -> %s\n' "$PS5" "$input" "$resultRef";; esac
+}
+adjustInterval()
+{
+    [ -n "$intervalAdjustment" ] || return 1
+    adjustInto interval "${interval}${intervalAdjustment}"
+    [ "$interval" != 0 ] || intervalAdjustment=''    # Optimization: Once the interval has been reduced to zero, it's not gonna increase again, so we can stop adjusting.
+}
 
 print()
 {
@@ -236,13 +180,14 @@ collectedLines=
 EOL=$'\n'
 SECONDS=$((interval - initialDelay))
 lineCnt=0
+isFirstExpiry=t
 while IFS=$'\n' read -r line || { EOL=; [ -n "$line" ]; }
 do
     isSkipThisLine=
     [ "$matchPattern" ] && [[ ! "$line" =~ $matchPattern ]] && isSkipThisLine=t
     [ "$skipPattern" ] && [[ "$line" =~ $skipPattern ]] && isSkipThisLine=t
     if [ "$isSkipThisLine" ]; then
-	if [ "$collectedLines" ]; then
+	if [ -n "$collectedLines" ]; then
 	    printf %s "$collectedLines" | runCommands || exit $?
 	    let commandRunCnt+=1
 	    hasReachedCountLimit && exec cat
@@ -256,9 +201,10 @@ do
     fi
 
     let lineCnt+=1
-    if [ $SECONDS -ge $interval ]; then
-	adjust interval "$intervalAdjustment"
-    elif [ ! "$lineInterval" ] || [ $lineCnt -lt $lineInterval ]; then
+    if [ -n "$interval" ] && [ $SECONDS -ge $interval ]; then
+	[ "$isFirstExpiry" ] || adjustInterval
+	isFirstExpiry=
+    elif [ -z "$lineInterval" ] || [ $lineCnt -lt $lineInterval ]; then
 	$process "${line}$EOL"
 	continue
     fi
@@ -286,6 +232,8 @@ do
 	lineCnt=0
     fi
 done
+[ ${#ADJUSTER[@]} -eq 0 ] || exec {ADJUSTER[1]}>&- {ADJUSTER[0]}<&-; ADJUSTER=()
+
 if [ "$collectedLines" ]; then
     if hasReachedCountLimit; then
 	printf %s "$collectedLines"
