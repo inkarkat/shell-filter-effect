@@ -22,7 +22,7 @@ printLongUsage()
     # It is printed to stdout to allow paging with 'more'.
     cat <<HELPDESCRIPTION
 Whenever there is output (but at least INTERVAL (default: 1 second) or LINE-NUM
-apart), execute the shell COMMANDS. If these fail, further processing is
+apart), execute the shell COMMAND(s). If these fail, further processing is
 aborted.
 HELPDESCRIPTION
     echo
@@ -30,37 +30,37 @@ HELPDESCRIPTION
     echo
     local -r timespanFormat="$(durationToSeconds --get-short-usage format 2>/dev/null || echo INTERVAL)"
     durationWithAdjustmentToSeconds --get-long-usage '--interval|-i' "Wait for INTERVAL seconds between executions of
-			COMMANDS, even if there's continuous output."
+			COMMAND(s), even if there's continuous output."
     cat <<HELPTEXT
     --initial-interval|-I ${timespanFormat}
 			There must be output for at least INTERVAL seconds
-			before first executing COMMANDS. By default, the first
-			output immediately triggers COMMANDS.
-    --immediate|-M	Directly execute COMMANDS for every (matching / not
+			before first executing COMMAND(s). By default, the first
+			output immediately triggers COMMAND(s).
+    --immediate|-M	Directly execute COMMAND(s) for every (matching / not
 			skipped) line; don't wait INTERVAL seconds.
     --line-interval|-l LINE-NUM
 			Wait until LINE-NUM lines have been output before doing
-			another execution of COMMANDS. If INTERVAL is also
+			another execution of COMMAND(s). If INTERVAL is also
 			given, one or the other has to be met.
     --non-whitespace|-w	Only output that does contains at least one
-			non-whitespace character triggers COMMANDS execution.
-    --before|-b		Execute COMMANDS before the output is printed (instead
+			non-whitespace character triggers COMMAND execution.
+    --before|-b		Execute COMMAND(s) before the output is printed (instead
 			of after it).
-    --append|-a		Execute COMMANDS after the output, but instead of a
+    --append|-a		Execute COMMAND(s) after the output, without a
 			concluding newline (so any line break has to come from
-			COMMANDS itself).
-    --piped|-p		Feed the output since the last invocation of COMMANDS or
-			the last encountered skipped line to COMMANDS (which
-			have to do any output themselves).
+			COMMAND(s) itself).
+    --piped|-p		Feed the output since the last invocation of COMMAND(s)
+			or the last encountered skipped line to COMMAND(s)
+			(which has to do any output itself).
     --skip|-s PATTERN	Ignore (but still print) lines that match PATTERN, so
-			that these don't trigger COMMANDS execution.
+			that these don't trigger COMMAND execution.
     --match|-m PATTERN	Only consider lines that match PATTERN for triggering
-			COMMANDS execution; other lines (and those that also
+			COMMAND execution; other lines (and those that also
 			match --skip PATTERN) are ignored.
     --count|-n N	Stop reacting on new output after N executions of
-			COMMAND.
-    --once|-1		Only execute COMMAND once after the first observation of
-			output.
+			COMMAND(s).
+    --once|-1		Only execute COMMAND(s) once after the first observation
+			of output.
 HELPTEXT
 }
 
