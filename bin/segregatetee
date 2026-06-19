@@ -5,7 +5,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: %q %s\n' "$(basename "$1")" '[--to DEFAULT-FILE [--to ...]] (-m|--match PATTERN|-x|--exclude PATTERN [-a|--append] [--] [FILE ...]) ... [-f|--fallback [-a|--append] FALLBACK-FILE] [-?|-h|--help]'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[--to DEFAULT-FILE [--to ...]] (-m|--match PATTERN|-v|--no-match PATTERN [-a|--append] [--] [FILE ...]) ... [-f|--fallback [-a|--append] FALLBACK-FILE] [-?|-h|--help]'
 }
 printUsage()
 {
@@ -34,7 +34,7 @@ HELPDESCRIPTION
     --match|-m PATTERN	    Only consider lines that match PATTERN when writing
 			    to the following FILE(s). If no FILE(s) are given,
 			    write to standard output / FALLBACK-FILE.
-    --exclude|-x PATTERN    Only consider lines that do not match PATTERN when
+    --no-match|-v PATTERN   Only consider lines that do not match PATTERN when
 			    writing to the following FILE(s). If no FILE(s) are
 			    given, write to standard output.
     --fallback|-f FALLBACK-FILE
@@ -82,8 +82,8 @@ do
 
 	--match=*)	lastPattern="${1#--match=}"; shift; matchPatterns+=("$lastPattern"); matchIsExclude["$lastPattern"]=;;
 	--match|-m)	shift; lastPattern="${1:?}"; shift; matchPatterns+=("$lastPattern"); matchIsExclude["$lastPattern"]=;;
-	--exclude=*)	lastPattern="${1#--exclude=}"; shift; matchPatterns+=("$lastPattern"); matchIsExclude["$lastPattern"]=t;;
-	--exclude|-x)	shift; lastPattern="${1:?}"; shift; matchPatterns+=("$lastPattern"); matchIsExclude["$lastPattern"]=t;;
+	--no-match=*)	lastPattern="${1#--no-match=}"; shift; matchPatterns+=("$lastPattern"); matchIsExclude["$lastPattern"]=t;;
+	--no-match|-v)	shift; lastPattern="${1:?}"; shift; matchPatterns+=("$lastPattern"); matchIsExclude["$lastPattern"]=t;;
 
 	--fallback|-f)	shift
 			if [[ "$1" = @(--append|-a) ]]; then
@@ -95,12 +95,12 @@ do
 	--to)		shift; addFile defaultFileIndices "${1:?}"; shift;;
 	--append|-a)	shift
 			if [ -z "$lastPattern" ]; then
-			    echo 'ERROR: --append must follow a --match or --exclude parameter.'
+			    echo 'ERROR: --append must follow a --match or --no-match parameter.'
 			    echo
 			    printUsage "$0"
 			    exit 2
 			elif [ -n "${matchFileIndices["$lastPattern"]}" ]; then
-			    echo 'ERROR: --append must immediately follow a --match or --exclude parameter.'
+			    echo 'ERROR: --append must immediately follow a --match or --no-match parameter.'
 			    echo
 			    printUsage "$0"
 			    exit 2
@@ -110,7 +110,7 @@ do
 	-|-[^-]*|--?*)	{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
 	--)		shift;&
 	*)		if [ -z "$lastPattern" ]; then
-			    echo 'ERROR: FILE(s) must follow a --match or --exclude parameter.'
+			    echo 'ERROR: FILE(s) must follow a --match or --no-match parameter.'
 			    echo
 			    printUsage "$0"
 			    exit 2
@@ -121,7 +121,7 @@ do
     esac
 done
 if [ ${#matchPatterns[@]} -eq 0 ]; then
-    echo 'ERROR: No --match or --exclude passed.'
+    echo 'ERROR: No --match or --no-match passed.'
     echo
     printUsage "$0"
     exit 2

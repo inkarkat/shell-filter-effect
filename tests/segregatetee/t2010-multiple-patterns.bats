@@ -22,8 +22,8 @@ EOF
 EOF
 }
 
-@test "mixing match and exclude patterns into the same file" {
-    run -0 segregatetee --exclude '^#' "$FILE1" --match '[0-9]' "$FILE1" < "$INPUT"
+@test "mixing match and no-match patterns into the same file" {
+    run -0 segregatetee --no-match '^#' "$FILE1" --match '[0-9]' "$FILE1" < "$INPUT"
     assert_output - <<'EOF'
 # attention!
 EOF
