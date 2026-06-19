@@ -30,3 +30,9 @@ load fixture
     assert_line -n 0 'ERROR: --append must immediately follow a --match or --no-match parameter.'
     assert_line -n 1 -e '^Usage:'
 }
+
+@test "FILE after --to prints message and usage instructions" {
+    run -2 segregatetee --match foo --to defaultFile exampleFile
+    assert_line -n 0 'ERROR: FILE(s) must follow a --match or --no-match parameter: exampleFile'
+    assert_line -n 1 -e '^Usage:'
+}
