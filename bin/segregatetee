@@ -92,9 +92,9 @@ do
     case "$1" in
 	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
 
-	--match=*)	handleDefaultFiles; lastPattern="${1#--match=}"; shift; matchPatterns+=("$lastPattern"); matchIsExclude["$lastPattern"]=; isDefaultFilesUsed=t;;
+	--match=*)	handleDefaultFiles; lastPattern="${1#--match=}"; shift; matchPatterns+=("${lastPattern:?}"); matchIsExclude["$lastPattern"]=; isDefaultFilesUsed=t;;
 	--match|-m)	shift; handleDefaultFiles; lastPattern="${1:?}"; shift; matchPatterns+=("$lastPattern"); matchIsExclude["$lastPattern"]=; isDefaultFilesUsed=t;;
-	--no-match=*)	handleDefaultFiles; lastPattern="${1#--no-match=}"; shift; matchPatterns+=("$lastPattern"); matchIsExclude["$lastPattern"]=t; isDefaultFilesUsed=t;;
+	--no-match=*)	handleDefaultFiles; lastPattern="${1#--no-match=}"; shift; matchPatterns+=("${lastPattern:?}"); matchIsExclude["$lastPattern"]=t; isDefaultFilesUsed=t;;
 	--no-match|-v)	shift; handleDefaultFiles; lastPattern="${1:?}"; shift; matchPatterns+=("$lastPattern"); matchIsExclude["$lastPattern"]=t; isDefaultFilesUsed=t;;
 
 	--fallback|-f)	shift
