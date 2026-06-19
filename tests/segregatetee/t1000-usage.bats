@@ -4,7 +4,7 @@ load fixture
 
 @test "no arguments prints message and usage instructions" {
     run -2 segregatetee
-    assert_line -n 0 'ERROR: No --match or --exclude passed.'
+    assert_line -n 0 'ERROR: No --match or --no-match passed.'
     assert_line -n 1 -e '^Usage:'
 }
 
@@ -21,12 +21,18 @@ load fixture
 
 @test "--append without --match prints message and usage instructions" {
     run -2 segregatetee --append
-    assert_line -n 0 'ERROR: --append must follow a --match or --exclude parameter.'
+    assert_line -n 0 'ERROR: --append must follow a --match or --no-match parameter.'
     assert_line -n 1 -e '^Usage:'
 }
 
 @test "--append after --match FILE prints message and usage instructions" {
     run -2 segregatetee --match foo FILE --append
-    assert_line -n 0 'ERROR: --append must immediately follow a --match or --exclude parameter.'
+    assert_line -n 0 'ERROR: --append must immediately follow a --match or --no-match parameter.'
+    assert_line -n 1 -e '^Usage:'
+}
+
+@test "FILE after --to prints message and usage instructions" {
+    run -2 segregatetee --match foo --to defaultFile exampleFile
+    assert_line -n 0 'ERROR: FILE(s) must follow a --match or --no-match parameter: exampleFile'
     assert_line -n 1 -e '^Usage:'
 }

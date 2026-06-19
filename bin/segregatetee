@@ -1,10 +1,11 @@
 #!/bin/bash
+shopt -qs extglob
 
 printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: %q %s\n' "$(basename "$1")" '[--to DEFAULT-FILE [--to ...]] (-m|--match PATTERN|-x|--exclude PATTERN [-a|--append] [--] [FILE ...]) ... [-?|-h|--help]'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '([--to DEFAULT-FILE [--to ...]] -m|--match PATTERN|-v|--no-match PATTERN [-a|--append] [--] [FILE ...]) ... [-f|--fallback [-a|--append] FALLBACK-FILE] [-?|-h|--help]'
 }
 printUsage()
 {
@@ -25,20 +26,27 @@ HELPDESCRIPTION
     echo
     printShortUsage "$1"
     cat <<HELPTEXT
-    --to DEFAULT-FILE	    Write to DEFAULT-FILE if no FILE(s) are given
-			    (instead of falling back to standard output). This
-			    allows to specify a FILE once for multiple PATTERNs
-			    without repeating it (which is important when using
-			    a single process substitution).
+    --to DEFAULT-FILE	    Write to DEFAULT-FILE if no FILE(s) are given to a
+			    following --[no-]match parameter (instead of falling
+			    back to standard output). This allows to specify a
+			    FILE once for multiple PATTERNs without repeating it
+			    (which is important when using a single process
+			    substitution). Another --to DEFAULT-FILE adds to the
+			    list as long as no --[no-]match parameter has been
+			    encountered yet, and resets the list of default
+			    files once a --[no-]match parameter is encountered.
     --match|-m PATTERN	    Only consider lines that match PATTERN when writing
 			    to the following FILE(s). If no FILE(s) are given,
-			    write to standard output.
-    --exclude|-x PATTERN    Only consider lines that do not match PATTERN when
+			    write to standard output / FALLBACK-FILE.
+    --no-match|-v PATTERN   Only consider lines that do not match PATTERN when
 			    writing to the following FILE(s). If no FILE(s) are
 			    given, write to standard output.
+    --fallback|-f FALLBACK-FILE
+			    Write to FALLBACK-FILE instead of standard output if
+			    no PATTERN matches.
     --append|-a		    Append to the following FILE(s) instead of
 			    truncating them. Only applies to the following (set
-			    of) FILE(s) (or DEFAULT-FILE(s)).
+			    of) FILE(s) (or DEFAULT-FILE(s) or FALLBACK-FILE).
     PATTERN is a POSIX-style unanchored extended regular expression.
 
 SEE ALSO:
@@ -48,46 +56,75 @@ HELPTEXT
 }
 
 typeset -a filespecs=()
-addFile()
+addFiles()
 {
     local varname="${1:?}"; shift
-    local file="${1:?}"; shift
-    local i; for ((i = 0; i < ${#filespecs[@]}; i++))
+    local file; for file
     do
-	if [ "$file" = "${filespecs[$i]}" ]; then
-	    eval "${varname}+=\"\$i \""
-	    return
-	fi
+	local i; for ((i = 0; i < ${#filespecs[@]}; i++))
+	do
+	    if [ "$file" = "${filespecs[$i]}" ]; then
+		eval "${varname}+=\"\$i \""
+		return
+	    fi
+	done
+	eval "${varname}+=\"\${#filespecs[@]} \""
+	filespecs+=("$file")
     done
-    eval "${varname}+=\"\${#filespecs[@]} \""
-    filespecs+=("$file")
+}
+handleDefaultFiles()
+{
+    [ -n "$lastPattern" ] && [ -z "${matchFileIndices["$lastPattern"]}" ] || return
+    addFiles 'matchFileIndices["$lastPattern"]' "${defaultFiles[@]}"
 }
 
+isDefaultFilesUsed=
 lastPattern=
 typeset -a matchPatterns=()
 typeset -A matchIsExclude=()
 typeset -A matchIsAppend=()
 typeset -A matchFileIndices=()
-defaultFileIndices=
+fallbackIsAppend=
+fallbackFileIndices=
+typeset -a defaultFiles=()
 while [ $# -ne 0 ]
 do
     case "$1" in
 	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
 
-	--match=*)	lastPattern="${1#--match=}"; shift; matchPatterns+=("$lastPattern"); matchIsExclude["$lastPattern"]=;;
-	--match|-m)	shift; lastPattern="${1:?}"; shift; matchPatterns+=("$lastPattern"); matchIsExclude["$lastPattern"]=;;
-	--exclude=*)	lastPattern="${1#--exclude=}"; shift; matchPatterns+=("$lastPattern"); matchIsExclude["$lastPattern"]=t;;
-	--exclude|-x)	shift; lastPattern="${1:?}"; shift; matchPatterns+=("$lastPattern"); matchIsExclude["$lastPattern"]=t;;
+	--match=*)	handleDefaultFiles; lastPattern="${1#--match=}"; shift; matchPatterns+=("$lastPattern"); matchIsExclude["$lastPattern"]=; isDefaultFilesUsed=t;;
+	--match|-m)	shift; handleDefaultFiles; lastPattern="${1:?}"; shift; matchPatterns+=("$lastPattern"); matchIsExclude["$lastPattern"]=; isDefaultFilesUsed=t;;
+	--no-match=*)	handleDefaultFiles; lastPattern="${1#--no-match=}"; shift; matchPatterns+=("$lastPattern"); matchIsExclude["$lastPattern"]=t; isDefaultFilesUsed=t;;
+	--no-match|-v)	shift; handleDefaultFiles; lastPattern="${1:?}"; shift; matchPatterns+=("$lastPattern"); matchIsExclude["$lastPattern"]=t; isDefaultFilesUsed=t;;
 
-	--to)		shift; addFile defaultFileIndices "${1:?}"; shift;;
+	--fallback|-f)	shift
+			if [[ "$1" = @(--append|-a) ]]; then
+			    shift
+			    fallbackIsAppend=t
+			fi
+			addFiles fallbackFileIndices "${1:?}"
+			shift
+			lastPattern=''
+			;;
+	--to)		shift
+			handleDefaultFiles
+			if [ "$isDefaultFilesUsed" ]; then
+			    isDefaultFilesUsed=
+			    defaultFiles=("${1:?}")
+			else
+			    defaultFiles+=("${1:?}")
+			fi
+			shift
+			lastPattern=''
+			;;
 	--append|-a)	shift
 			if [ -z "$lastPattern" ]; then
-			    echo 'ERROR: --append must follow a --match or --exclude parameter.'
+			    echo 'ERROR: --append must follow a --match or --no-match parameter.'
 			    echo
 			    printUsage "$0"
 			    exit 2
 			elif [ -n "${matchFileIndices["$lastPattern"]}" ]; then
-			    echo 'ERROR: --append must immediately follow a --match or --exclude parameter.'
+			    echo 'ERROR: --append must immediately follow a --match or --no-match parameter.'
 			    echo
 			    printUsage "$0"
 			    exit 2
@@ -97,18 +134,19 @@ do
 	-|-[^-]*|--?*)	{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
 	--)		shift;&
 	*)		if [ -z "$lastPattern" ]; then
-			    echo 'ERROR: FILE(s) must follow a --match or --exclude parameter.'
+			    printf 'ERROR: FILE(s) must follow a --match or --no-match parameter: %s\n' "$1"
 			    echo
 			    printUsage "$0"
 			    exit 2
 			fi >&2
-			addFile 'matchFileIndices["$lastPattern"]' "${1:?}"
+			addFiles 'matchFileIndices["$lastPattern"]' "${1:?}"
 			shift
 			;;
     esac
 done
+handleDefaultFiles
 if [ ${#matchPatterns[@]} -eq 0 ]; then
-    echo 'ERROR: No --match or --exclude passed.'
+    echo 'ERROR: No --match or --no-match passed.'
     echo
     printUsage "$0"
     exit 2
@@ -121,12 +159,8 @@ write()
     local isAppend="${1?}"; shift
 
     if [ -z "$fileIndices" ]; then
-	if [ -n "$defaultFileIndices" ]; then
-	    fileIndices="$defaultFileIndices"
-	else
-	    printf %s "$contents"
-	    return
-	fi
+	printf %s "$contents"
+	return
     fi
 
     local i; for i in $fileIndices
@@ -147,6 +181,7 @@ for match in "${matchPatterns[@]}"
 do
     write '' "${matchFileIndices["$match"]}" "${matchIsAppend["$match"]}"
 done
+[ -z "$fallbackFileIndices" ] || write '' "$fallbackFileIndices" "$fallbackIsAppend"
 
 EOL=$'\n'
 while IFS=$'\n' read -r line || { EOL=; [ -n "$line" ]; }
@@ -164,6 +199,6 @@ do
 	    break
 	fi
     done
-    [ "$hasMatch" ] || printf %s "${line}$EOL"
+    [ "$hasMatch" ] || write "${line}$EOL" "$fallbackFileIndices" t
 done
 exit $status

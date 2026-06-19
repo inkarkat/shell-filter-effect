@@ -28,7 +28,7 @@ EOF
 }
 
 @test "matching everything except comments" {
-    run -0 segregatetee --exclude '^#' "$FILE1" < "$INPUT"
+    run -0 segregatetee --no-match '^#' "$FILE1" < "$INPUT"
     assert_output - <<'EOF'
 # 0 comment header
 # attention!
