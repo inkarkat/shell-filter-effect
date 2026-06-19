@@ -1,10 +1,11 @@
 #!/bin/bash
+shopt -qs extglob
 
 printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: %q %s\n' "$(basename "$1")" '[--to DEFAULT-FILE [--to ...]] (-m|--match PATTERN|-x|--exclude PATTERN [-a|--append] [--] [FILE ...]) ... [-?|-h|--help]'
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[--to DEFAULT-FILE [--to ...]] (-m|--match PATTERN|-x|--exclude PATTERN [-a|--append] [--] [FILE ...]) ... [-f|--fallback [-a|--append] FALLBACK-FILE] [-?|-h|--help]'
 }
 printUsage()
 {
@@ -32,13 +33,16 @@ HELPDESCRIPTION
 			    a single process substitution).
     --match|-m PATTERN	    Only consider lines that match PATTERN when writing
 			    to the following FILE(s). If no FILE(s) are given,
-			    write to standard output.
+			    write to standard output / FALLBACK-FILE.
     --exclude|-x PATTERN    Only consider lines that do not match PATTERN when
 			    writing to the following FILE(s). If no FILE(s) are
 			    given, write to standard output.
+    --fallback|-f FALLBACK-FILE
+			    Write to FALLBACK-FILE instead of standard output if
+			    no PATTERN matches.
     --append|-a		    Append to the following FILE(s) instead of
 			    truncating them. Only applies to the following (set
-			    of) FILE(s) (or DEFAULT-FILE(s)).
+			    of) FILE(s) (or DEFAULT-FILE(s) or FALLBACK-FILE).
     PATTERN is a POSIX-style unanchored extended regular expression.
 
 SEE ALSO:
@@ -68,6 +72,8 @@ typeset -a matchPatterns=()
 typeset -A matchIsExclude=()
 typeset -A matchIsAppend=()
 typeset -A matchFileIndices=()
+fallbackIsAppend=
+fallbackFileIndices=
 defaultFileIndices=
 while [ $# -ne 0 ]
 do
@@ -79,6 +85,13 @@ do
 	--exclude=*)	lastPattern="${1#--exclude=}"; shift; matchPatterns+=("$lastPattern"); matchIsExclude["$lastPattern"]=t;;
 	--exclude|-x)	shift; lastPattern="${1:?}"; shift; matchPatterns+=("$lastPattern"); matchIsExclude["$lastPattern"]=t;;
 
+	--fallback|-f)	shift
+			if [[ "$1" = @(--append|-a) ]]; then
+			    shift
+			    fallbackIsAppend=t
+			fi
+			addFile fallbackFileIndices "${1:?}"
+			shift;;
 	--to)		shift; addFile defaultFileIndices "${1:?}"; shift;;
 	--append|-a)	shift
 			if [ -z "$lastPattern" ]; then
@@ -147,6 +160,7 @@ for match in "${matchPatterns[@]}"
 do
     write '' "${matchFileIndices["$match"]}" "${matchIsAppend["$match"]}"
 done
+[ -z "$fallbackFileIndices" ] || write '' "$fallbackFileIndices" "$fallbackIsAppend"
 
 EOL=$'\n'
 while IFS=$'\n' read -r line || { EOL=; [ -n "$line" ]; }
@@ -164,6 +178,6 @@ do
 	    break
 	fi
     done
-    [ "$hasMatch" ] || printf %s "${line}$EOL"
+    [ "$hasMatch" ] || defaultFileIndices='' write "${line}$EOL" "$fallbackFileIndices" t
 done
 exit $status
