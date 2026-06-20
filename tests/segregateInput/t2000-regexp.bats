@@ -136,3 +136,27 @@ this is unusual
 # 99 comment trailer
 EOF
 }
+
+@test "matching leading numbers twice with the identical pattern combines the commands" {
+    run -0 segregateInput --regexp-command '^[0-9]' "$FRAGMENT_COMMAND" --regexp-command '^[0-9]' "$QUOTE_COMMAND" < "$INPUT"
+    assert_output - <<'EOF'
+# 0 comment header
+>,----
+>| 1 first line
+>| 2 second line
+>`----
+
+>,----
+>| 3 third element
+>| 4 more
+>`----
+
+# attention!
+this is unusual
+
+>,----
+>| 98 the end
+>`----
+# 99 comment trailer
+EOF
+}

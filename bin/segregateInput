@@ -2,6 +2,7 @@
 set -o pipefail
 shopt -qs extglob
 
+: ${SEGREGATEINPUT_COMMAND_JOINER='|'}
 : ${SEGREGATEINPUT_EXEC_END=;}
 : ${SEGREGATEINPUT_INPUT_MARKER='{}'}
 inputMarker="$SEGREGATEINPUT_INPUT_MARKER"; unset SEGREGATEINPUT_INPUT_MARKER
@@ -108,6 +109,9 @@ HELPDESCRIPTION
 			    the CMD until an argument consisting of '${SEGREGATEINPUT_EXEC_END}' is
 			    encountered.
     PATTERN is a POSIX-style unanchored extended regular expression.
+    You must not pass the same PATTERN to different kinds of matches (i.e.
+    --regexp, --match, or --no-match). The same PATTERN for the same kind of
+    match combines the new COMMAND with the existing one in a pipeline.
 
 SEE ALSO:
 - segregatetee has the same --regexp / --no-match matching (but no identical
@@ -125,6 +129,12 @@ HELPTEXT
 
 readonly FALLBACK_INDEX=-1
 readonly STDOUT_INDEX=-2
+typeset -a matchPatterns=()
+typeset -A matchKind=()
+typeset -A matchIsExclude=()
+typeset -A matchIsIdenticalContext=()
+typeset -A matchCommandIndices=()
+fallbackCommandIndex=$FALLBACK_INDEX
 let lastUsedIndex=$FALLBACK_INDEX
 typeset -a commands=()
 submitCommand()
@@ -138,22 +148,33 @@ addCommandFor()
     local kind="${1:?}"; shift
     local pattern="${1?}"; shift
     local cmd="${1:?}"; shift
-    submitCommand "$cmd"
-    addIndexFor "$kind" "$pattern" $lastUsedIndex
+
+    if [ -n "$pattern" ] \
+	&& local existingIndex=${matchCommandIndices["$pattern"]} \
+	&& [ -n "$existingIndex" ]
+    then
+	if [ "${matchKind["$pattern"]}" != "$kind" ]; then
+	    printf >&2 "ERROR: Pattern '%s' is specified more than once for different kinds: --%s and --%s\\n" "$pattern" "${matchKind["$pattern"]}" "$kind"
+	    exit 2
+	fi
+
+	# Combine the new command with the existing one (by default in a pipeline).
+	commands[$existingIndex]+=" $SEGREGATEINPUT_COMMAND_JOINER $cmd"
+    else
+	submitCommand "$cmd"
+	addIndexFor "$kind" "$pattern" $lastUsedIndex
+    fi
 }
-typeset -a matchPatterns=()
-typeset -A matchIsExclude=()
-typeset -A matchIsIdenticalContext=()
-typeset -A matchCommandIndices=()
-fallbackCommandIndex=$FALLBACK_INDEX
 addIndexFor()
 {
     local kind="${1:?}"; shift
     local pattern="${1?}"; shift
     local index="${1:?}"; shift
+
     if [ -n "$pattern" ]; then
 	matchCommandIndices["$pattern"]=$index
 	matchPatterns+=("$pattern")
+	matchKind["$pattern"]="$kind"
 	case "$kind" in
 	    regexp)	;;
 	    match)	matchIsIdenticalContext["$pattern"]=t;;

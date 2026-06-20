@@ -50,6 +50,36 @@ EOF
 EOF
 }
 
+@test "identical matches twice with the identical pattern combines the commands" {
+    run -0 segregateInput --match-exec '9|[a-z]+$' "${COUNT_COMMAND[@]}" \; --match-command '9|[a-z]+$' "$FRAGMENT_COMMAND" < "$INPUT"
+    assert_output - <<'EOF'
+,----
+| 1
+`----
+,----
+| 1
+| 2
+`----
+
+,----
+| 1
+`----
+,----
+| 1
+`----
+
+# attention!
+,----
+| 1
+`----
+
+,----
+| 1
+| 2
+`----
+EOF
+}
+
 @test "identical exec matches take precedence over equivalent following pattern" {
     run -0 segregateInput --match-exec '9|[a-z]+$' "${COUNT_COMMAND[@]}" \; --match-command '[9]|[abcdefghijklmnopqrstuvwxyz]+$' "$QUOTE_COMMAND" < "$INPUT"
     assert_output - <<'EOF'
