@@ -25,12 +25,14 @@ printLongUsage()
     # It is printed to stdout to allow paging with 'more'.
     cat <<HELPDESCRIPTION
 Read from standard input and pipe all consecutive (non-)matching lines (i.e. all
-lines that [do not] match a particular PATTERN) to COMMAND(s). The first
-consumer wins; i.e. each line is only piped to a single COMMAND. Any left-over
-lines are written to standard output.
+lines that [do not] match a particular PATTERN or have an identical match) to
+COMMAND(s).
+The first consumer wins; i.e. each line is only piped to a single COMMAND. Any
+left-over lines are written to standard output / piped to a FALLBACK-COMMAND.
 HELPDESCRIPTION
     echo
     printShortUsage "$1"
+    echo
     cat <<HELPTEXT
     --to-command|-t DEFAULT-CMD
 			    Pipe into${inputMarker:+ or replace any $inputMarker marker inside}
@@ -108,10 +110,11 @@ HELPDESCRIPTION
     PATTERN is a POSIX-style unanchored extended regular expression.
 
 SEE ALSO:
-- segregatetee has the same matching but writes to FILE(s) (also multiple). With
-  command substitution targets, it sends all collections of (non-)matches to
-  COMMAND(s) instead of invoking a COMMAND potentially multiple times for each
-  collection of consecutive (non-)matches.
+- segregatetee has the same --regexp / --no-match matching (but no identical
+  match segregation) but writes to FILE(s) (also multiple) instead of COMMAND
+  sinks. With command substitution targets, it sends all collections of
+  (non-)matches to COMMAND(s) instead of invoking a COMMAND potentially multiple
+  times for each collection of consecutive (non-)matches.
 - withOutputToSinkBasedOnMatch includes the source command execution, invokes
   sinks only after it has seen all output, and applies all PATTERN(s) instead of
   first-PATTERN-wins. Like segregatetee, each sink command sees all lines that
