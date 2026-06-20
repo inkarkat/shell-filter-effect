@@ -49,3 +49,21 @@ EOF
 `----
 EOF
 }
+
+@test "counting everything but empty lines" {
+    run -0 segregateInput --no-match-exec '^$' "${COUNT_COMMAND[@]}" \; < "$INPUT"
+    assert_output - <<'EOF'
+1
+2
+3
+
+1
+2
+
+1
+2
+
+1
+2
+EOF
+}

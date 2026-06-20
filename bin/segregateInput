@@ -258,7 +258,7 @@ do
 			    exit 2
 			fi >&2
 			shift
-			addCommandFor '' "$cmd"; shift
+			addCommandFor '' "$cmd"
 			;;
 	--to-command|-t)
 			shift; submitCommand "${1:?}"; shift; toCommandIndex=$lastUsedIndex;;

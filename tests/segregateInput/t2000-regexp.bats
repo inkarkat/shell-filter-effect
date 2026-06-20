@@ -100,3 +100,21 @@ this is unusual
 `----
 EOF
 }
+
+@test "match-exec counting lines with leading numbers (consecutive lines)" {
+    run -0 segregateInput --regexp-exec '^[0-9]' "${COUNT_COMMAND[@]}" \; < "$INPUT"
+    assert_output - <<'EOF'
+# 0 comment header
+1
+2
+
+1
+2
+
+# attention!
+this is unusual
+
+1
+# 99 comment trailer
+EOF
+}

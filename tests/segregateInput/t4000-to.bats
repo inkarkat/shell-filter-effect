@@ -65,6 +65,28 @@ this is unusual
 EOF
 }
 
+@test "two different patterns with separate to-exec processes lines together " {
+    run -0 segregateInput \
+	--to-exec "${COUNT_COMMAND[@]}" \; \
+	--regexp '^#' \
+	--regexp '[0-9]' \
+	< "$INPUT"
+    assert_output - <<'EOF'
+1
+2
+3
+
+1
+2
+
+1
+this is unusual
+
+1
+2
+EOF
+}
+
 @test "use of two different to-commands" {
     run -0 segregateInput \
 	--to-command "$QUOTE_COMMAND" \

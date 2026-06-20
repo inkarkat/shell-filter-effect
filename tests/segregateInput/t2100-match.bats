@@ -31,3 +31,21 @@ load fixture
 `----
 EOF
 }
+
+@test "identical matches only count lines with a 9 or the same last word" {
+    run -0 segregateInput --match-exec '9|[a-z]+$' "${COUNT_COMMAND[@]}" \; < "$INPUT"
+    assert_output - <<'EOF'
+1
+1
+2
+
+1
+1
+
+# attention!
+1
+
+1
+2
+EOF
+}
