@@ -85,3 +85,25 @@ EOF
 # 99 comment trailer
 EOF
 }
+
+@test "fallback command twice combines the commands" {
+    run -0 segregateInput \
+	--fallback-exec "${COUNT_COMMAND[@]}" \; \
+	--fallback-command "$QUOTE_COMMAND" \
+	--regexp-command '^#' "$UPPERCASE_COMMAND" \
+	< "$INPUT"
+    assert_output - <<'EOF'
+# 0 COMMENT HEADER
+>1
+>2
+>3
+>4
+>5
+>6
+# ATTENTION!
+>1
+>2
+>3
+# 99 COMMENT TRAILER
+EOF
+}

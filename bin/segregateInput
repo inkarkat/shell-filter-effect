@@ -11,7 +11,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: %q %s\n' "$(basename "$1")" "(([-t|--to-command DEFAULT-COMMANDLINE | --to-exec SIMPLECOMMAND [...] ${SEGREGATEINPUT_EXEC_END}] --regexp|--match|--no-match PATTERN|--fallback) ...) | -e|--regexp-command|-m|--match-command|-v|--no-match-command PATTERN \"COMMANDLINE\" | -E|--regexp-exec|-M|--match-exec|-V|--no-match-exec SIMPLECOMMAND [...] ${SEGREGATEINPUT_EXEC_END}) ... [-f|--fallback-command \"FALLBACK-COMMANDLINE\" | -F|--fallback-exec SIMPLECOMMAND [...] ${SEGREGATEINPUT_EXEC_END}] [-?|-h|--help]"
+    printf 'Usage: %q %s\n' "$(basename "$1")" "(([-t|--to-command DEFAULT-COMMANDLINE | --to-exec SIMPLECOMMAND [...] ${SEGREGATEINPUT_EXEC_END}] --regexp|--match|--no-match PATTERN|--fallback) ...) | -e|--regexp-command|-m|--match-command|-v|--no-match-command PATTERN \"COMMANDLINE\" | -E|--regexp-exec|-M|--match-exec|-V|--no-match-exec SIMPLECOMMAND [...] ${SEGREGATEINPUT_EXEC_END}) ... [(-f|--fallback-command \"FALLBACK-COMMANDLINE\" | -F|--fallback-exec SIMPLECOMMAND [...] ${SEGREGATEINPUT_EXEC_END}) ...] [-?|-h|--help]"
 }
 printUsage()
 {
@@ -99,7 +99,9 @@ HELPDESCRIPTION
 			    Pipe into${inputMarker:+ or replace any $inputMarker marker inside}
 			    FALLBACK-CMD for consecutive lines that aren't
 			    captured by any PATTERN instead of writing those to
-			    standard output.
+			    standard output. When given multiple times, the new
+			    FALLBACK-CMD is combined with the existing one in a
+			    pipeline.
     --fallback-exec|-F FALLBACK-CMD [...] ${SEGREGATEINPUT_EXEC_END}
 			    Pipe into${inputMarker:+ or replace any $inputMarker marker inside}
 			    FALLBACK-CMD for consecutive lines that aren't
@@ -107,7 +109,9 @@ HELPDESCRIPTION
 			    standard output.
 			    All following arguments are taken to be arguments to
 			    the CMD until an argument consisting of '${SEGREGATEINPUT_EXEC_END}' is
-			    encountered.
+			    encountered. When given multiple times, the new
+			    FALLBACK-CMD is combined with the existing one in a
+			    pipeline.
     PATTERN is a POSIX-style unanchored extended regular expression.
     You must not pass the same PATTERN to different kinds of matches (i.e.
     --regexp, --match, or --no-match). The same PATTERN for the same kind of
@@ -160,6 +164,10 @@ addCommandFor()
 
 	# Combine the new command with the existing one (by default in a pipeline).
 	commands[$existingIndex]+=" $SEGREGATEINPUT_COMMAND_JOINER $cmd"
+    elif [ -z "$pattern" ] && [ "$kind" = fallback ] \
+	&& [ $fallbackCommandIndex -ne $FALLBACK_INDEX ]
+    then
+	commands[$fallbackCommandIndex]+=" $SEGREGATEINPUT_COMMAND_JOINER $cmd"
     else
 	submitCommand "$cmd"
 	addIndexFor "$kind" "$pattern" $lastUsedIndex
