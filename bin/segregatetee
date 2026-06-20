@@ -25,6 +25,7 @@ FILE(s). Any left-over lines are written to standard output.
 HELPDESCRIPTION
     echo
     printShortUsage "$1"
+    echo
     cat <<HELPTEXT
     --to DEFAULT-FILE	    Write to DEFAULT-FILE if no FILE(s) are given to a
 			    following --[no-]match parameter (instead of falling
@@ -52,6 +53,12 @@ HELPDESCRIPTION
 SEE ALSO:
 - filtertee sends lines (or specificially non-whitespace lines) to FILE(s) based
   on patterns but also prints everything to stdout.
+- segregateInput pipes or passes consecutive lines to COMMAND(s) instead of
+  writing to FILE(s) based on the same pattern matching (and in addition
+  supporting segregation of lines with identical matches, not just the same
+  PATTERN match). That maintains the original order of lines while chunking and
+  segregating them, whereas this command just segregates into FILE(s) / separate
+  command substitutions.
 HELPTEXT
 }
 
