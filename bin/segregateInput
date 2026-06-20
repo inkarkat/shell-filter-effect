@@ -1,0 +1,350 @@
+#!/bin/bash
+set -o pipefail
+shopt -qs extglob
+
+: ${SEGREGATEINPUT_EXEC_END=;}
+: ${SEGREGATEINPUT_INPUT_MARKER='{}'}
+inputMarker="$SEGREGATEINPUT_INPUT_MARKER"; unset SEGREGATEINPUT_INPUT_MARKER
+
+printShortUsage()
+{
+    # Note: short followed by long option; if the user knows the short one, she can
+    # skim the long one.
+    printf 'Usage: %q %s\n' "$(basename "$1")" "(([-t|--to-command DEFAULT-COMMANDLINE | --to-exec SIMPLECOMMAND [...] ${SEGREGATEINPUT_EXEC_END}] --regexp|--match|--no-match PATTERN|--fallback) ...) | -e|--regexp-command|-m|--match-command|-v|--no-match-command PATTERN \"COMMANDLINE\" | -E|--regexp-exec|-M|--match-exec|-V|--no-match-exec SIMPLECOMMAND [...] ${SEGREGATEINPUT_EXEC_END}) ... [-f|--fallback-command \"FALLBACK-COMMANDLINE\" | -F|--fallback-exec SIMPLECOMMAND [...] ${SEGREGATEINPUT_EXEC_END}] [-?|-h|--help]"
+}
+printUsage()
+{
+    # This is the short help when launched with no or incorrect arguments.
+    # It is printed to stderr to avoid accidental processing.
+    printShortUsage "$1" >&2
+    printf >&2 '\nTry %q --help for more information.\n' "$(basename "$1")"
+}
+printLongUsage()
+{
+    # This is the long "man page" when launched with the help argument.
+    # It is printed to stdout to allow paging with 'more'.
+    cat <<HELPDESCRIPTION
+Read from standard input and pipe all consecutive (non-)matching lines (i.e. all
+lines that [do not] match a particular PATTERN) to COMMAND(s). The first
+consumer wins; i.e. each line is only piped to a single COMMAND. Any left-over
+lines are written to standard output.
+HELPDESCRIPTION
+    echo
+    printShortUsage "$1"
+    cat <<HELPTEXT
+    --to-command|-t DEFAULT-CMD
+			    Pipe into${inputMarker:+ or replace any $inputMarker marker inside}
+			    DEFAULT-CMD for consecutive lines captured by any
+			    following --regexp, --[no-]match PATTERN or
+			    --fallback. With this you can pipe / pass
+			    consecutive lines [not] matching more than one
+			    PATTERN into a single CMD.
+    --to-exec|-t DEFAULT-CMD [...] ${SEGREGATEINPUT_EXEC_END}
+			    Pipe into${inputMarker:+ or replace any $inputMarker marker inside}
+			    DEFAULT-CMD for consecutive lines captured by any
+			    following --regexp, --[no-]match PATTERN or
+			    --fallback. All following arguments are taken to be
+			    arguments to the CMD until an argument consisting of
+			    '${SEGREGATEINPUT_EXEC_END}' is encountered. With this you can pipe / pass
+			    consecutive lines [not] matching more than one
+			    PATTERN into a single CMD.
+    --regexp PATTERN	    Consecutive lines that match PATTERN are written to
+			    standard output / piped into ${inputMarker:+or replace any $inputMarker
+			    marker inside }DEFAULT-CMD.
+    --regexp-command|-e PATTERN CMD
+			    Execute CMD. Consecutive lines that match PATTERN
+			    ${inputMarker:+either }are piped into${inputMarker:+ or replace any $inputMarker marker
+			    inside }CMD.
+    --regexp-exec|-E PATTERN CMD [...] ${SEGREGATEINPUT_EXEC_END}
+			    Execute CMD; all following arguments are taken to be
+			    arguments to the CMD until an argument consisting of
+			    '${SEGREGATEINPUT_EXEC_END}' is encountered. Consecutive lines that match
+			    PATTERN ${inputMarker:+either }are piped into${inputMarker:+ or replace any $inputMarker
+			    marker inside }COMMANDLINE.
+    --match PATTERN	    Consecutive lines that have identical matches of
+			    PATTERN are written to standard output / piped into
+			    ${inputMarker:+or replace any $inputMarker marker inside }DEFAULT-CMD.
+    --match-command|-m PATTERN CMD
+			    Execute CMD. Consecutive lines that have identical
+			    matches of PATTERN ${inputMarker:+either }are piped into${inputMarker:+ or replace
+			    any $inputMarker marker inside }CMD.
+    --match-exec|-M PATTERN CMD [...] ${SEGREGATEINPUT_EXEC_END}
+			    Execute CMD; all following arguments are taken to be
+			    arguments to the CMD until an argument consisting of
+			    '${SEGREGATEINPUT_EXEC_END}' is encountered.
+			    Consecutive lines that have identical matches of
+			    PATTERN ${inputMarker:+either }are piped into${inputMarker:+ or replace any $inputMarker
+			    marker inside }COMMANDLINE.
+    --no-match PATTERN	    Consecutive lines that do not match PATTERN are
+			    written to standard output / piped into ${inputMarker:+or replace
+			    any $inputMarker marker inside }DEFAULT-CMD.
+    --no-match-command|-v PATTERN CMD
+			    Execute CMD. Consecutive lines that do not match
+			    PATTERN ${inputMarker:+either }are piped into${inputMarker:+ or replace any $inputMarker
+			    marker inside }CMD.
+    --no-match-exec|-V PATTERN CMD [...] ${SEGREGATEINPUT_EXEC_END}
+			    Execute CMD; all following arguments are taken to be
+			    arguments to the CMD until an argument consisting of
+			    '${SEGREGATEINPUT_EXEC_END}' is encountered. Consecutive lines that do not
+			    match PATTERN ${inputMarker:+either }are piped into${inputMarker:+ or replace any
+			    $inputMarker marker inside }COMMANDLINE.
+    --fallback		    Pipe into${inputMarker:+ or replace any $inputMarker marker inside}
+			    DEFAULT-CMD for consecutive lines that aren't
+			    captured by any PATTERN instead of writing those to
+			    standard output.
+    --fallback-command|-f FALLBACK-CMD
+			    Pipe into${inputMarker:+ or replace any $inputMarker marker inside}
+			    FALLBACK-CMD for consecutive lines that aren't
+			    captured by any PATTERN instead of writing those to
+			    standard output.
+    --fallback-exec|-F FALLBACK-CMD [...] ${SEGREGATEINPUT_EXEC_END}
+			    Pipe into${inputMarker:+ or replace any $inputMarker marker inside}
+			    FALLBACK-CMD for consecutive lines that aren't
+			    captured by any PATTERN instead of writing those to
+			    standard output.
+			    All following arguments are taken to be arguments to
+			    the CMD until an argument consisting of '${SEGREGATEINPUT_EXEC_END}' is
+			    encountered.
+    PATTERN is a POSIX-style unanchored extended regular expression.
+
+SEE ALSO:
+- segregatetee has the same matching but writes to FILE(s) (also multiple). With
+  command substitution targets, it sends all collections of (non-)matches to
+  COMMAND(s) instead of invoking a COMMAND potentially multiple times for each
+  collection of consecutive (non-)matches.
+- withOutputToSinkBasedOnMatch includes the source command execution, invokes
+  sinks only after it has seen all output, and applies all PATTERN(s) instead of
+  first-PATTERN-wins. Like segregatetee, each sink command sees all lines that
+  match their PATTERN instead of invoking a COMMAND potentially multiple times
+  for each collection of consecutive (non-)matches.
+HELPTEXT
+}
+
+let lastUsedIndex=-1
+typeset -a commands=()
+submitCommand()
+{
+    local cmd="${1:?}"; shift
+    let lastUsedIndex++
+    commands[$lastUsedIndex]="$cmd"
+}
+addCommandFor()
+{
+    local pattern="${1?}"; shift
+    local cmd="${1:?}"; shift
+    submitCommand "$cmd"
+    addIndexFor "$pattern" $lastUsedIndex
+}
+addIndexFor()
+{
+    local pattern="${1?}"; shift
+    local index="${1:?}"; shift
+    [ -n "$pattern" ] \
+	&& matchCommandIndices["$pattern"]=$index \
+	|| fallbackCommandIndex=$index
+}
+
+toCommandIndex=
+typeset -a matchPatterns=()
+typeset -A matchIsExclude=()
+typeset -A matchIsIdenticalContext=()
+typeset -A matchCommandIndices=()
+fallbackCommandIndex=-1
+while [ $# -ne 0 ]
+do
+    case "$1" in
+	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
+
+	--regexp=*)	pattern="${1#--regexp=}"; shift; matchPatterns+=("${pattern:?}")
+			[ -z "$toCommandIndex" ] || addIndexFor "$pattern" $toCommandIndex
+			;;
+	--regexp)	shift; pattern="${1:?}"; shift; matchPatterns+=("$pattern")
+			[ -z "$toCommandIndex" ] || addIndexFor "$pattern" $toCommandIndex
+			;;
+	--regexp-command|-e)
+			shift; pattern="${1:?}"; shift; matchPatterns+=("$pattern")
+			addCommandFor "$pattern" "${1:?}"; shift
+			;;
+	--regexp-exec|-E)
+			shift; pattern="${1:?}"; shift; matchPatterns+=("$pattern")
+			cmd=
+			printf -v escapedInputMarker %q "$inputMarker"
+			while [ $# -gt 0 -a "$1" != "$SEGREGATEINPUT_EXEC_END" ]
+			do
+			    printf -v quotedArg %q "$1"
+			    cmd+="${cmd:+ }${quotedArg//"$escapedInputMarker"/$inputMarker}"	# %q escapes {}, we don't want that to have it interpolated later.
+			    shift
+			done
+			if [ $# -eq 0 ]; then
+			    echo "ERROR: --regexp-exec command must be concluded with '${SEGREGATEINPUT_EXEC_END}'"; echo; printUsage "$0"
+			    exit 2
+			fi >&2
+			shift
+			addCommandFor "$pattern" "$cmd"; shift
+			;;
+	--match=*)	pattern="${1#--match=}"; shift; matchPatterns+=("${pattern:?}"); matchIsIdenticalContext["$pattern"]=t
+			[ -z "$toCommandIndex" ] || addIndexFor "$pattern" $toCommandIndex
+			;;
+	--match)	shift; pattern="${1:?}"; shift; matchPatterns+=("$pattern"); matchIsIdenticalContext["$pattern"]=t
+			[ -z "$toCommandIndex" ] || addIndexFor "$pattern" $toCommandIndex
+			;;
+	--match-command|-m)
+			shift; pattern="${1:?}"; shift; matchPatterns+=("$pattern"); matchIsIdenticalContext["$pattern"]=t
+			addCommandFor "$pattern" "${1:?}"; shift
+			;;
+	--match-exec|-M)
+			shift; pattern="${1:?}"; shift; matchPatterns+=("$pattern"); matchIsIdenticalContext["$pattern"]=t
+			cmd=
+			printf -v escapedInputMarker %q "$inputMarker"
+			while [ $# -gt 0 -a "$1" != "$SEGREGATEINPUT_EXEC_END" ]
+			do
+			    printf -v quotedArg %q "$1"
+			    cmd+="${cmd:+ }${quotedArg//"$escapedInputMarker"/$inputMarker}"	# %q escapes {}, we don't want that to have it interpolated later.
+			    shift
+			done
+			if [ $# -eq 0 ]; then
+			    echo "ERROR: --match-exec command must be concluded with '${SEGREGATEINPUT_EXEC_END}'"; echo; printUsage "$0"
+			    exit 2
+			fi >&2
+			shift
+			addCommandFor "$pattern" "$cmd"; shift
+			;;
+	--no-match=*)	pattern="${1#--no-match=}"; shift; matchPatterns+=("${pattern:?}"); matchIsExclude["$pattern"]=t
+			[ -z "$toCommandIndex" ] || addIndexFor "$pattern" $toCommandIndex
+			;;
+	--no-match)	shift; pattern="${1:?}"; shift; matchPatterns+=("$pattern"); matchIsExclude["$pattern"]=t
+			[ -z "$toCommandIndex" ] || addIndexFor "$pattern" $toCommandIndex
+			;;
+	--no-match-command|-v)
+			shift; pattern="${1:?}"; shift; matchPatterns+=("$pattern"); matchIsExclude["$pattern"]=t
+			addCommandFor "$pattern" "${1:?}"; shift
+			;;
+	--no-match-exec|-V)
+			shift; pattern="${1:?}"; shift; matchPatterns+=("$pattern"); matchIsExclude["$pattern"]=t
+			cmd=
+			printf -v escapedInputMarker %q "$inputMarker"
+			while [ $# -gt 0 -a "$1" != "$SEGREGATEINPUT_EXEC_END" ]
+			do
+			    printf -v quotedArg %q "$1"
+			    cmd+="${cmd:+ }${quotedArg//"$escapedInputMarker"/$inputMarker}"	# %q escapes {}, we don't want that to have it interpolated later.
+			    shift
+			done
+			if [ $# -eq 0 ]; then
+			    echo "ERROR: --no-match-exec command must be concluded with '${SEGREGATEINPUT_EXEC_END}'"; echo; printUsage "$0"
+			    exit 2
+			fi >&2
+			shift
+			addCommandFor "$pattern" "$cmd"; shift
+			;;
+	--fallback)	shift
+			[ -z "$toCommandIndex" ] || addIndexFor '' $toCommandIndex
+			;;
+	--fallback-command|-f)
+			shift
+			addCommandFor '' "${1:?}"; shift
+			;;
+	--fallback-exec|-F)
+			shift
+			cmd=
+			printf -v escapedInputMarker %q "$inputMarker"
+			while [ $# -gt 0 -a "$1" != "$SEGREGATEINPUT_EXEC_END" ]
+			do
+			    printf -v quotedArg %q "$1"
+			    cmd+="${cmd:+ }${quotedArg//"$escapedInputMarker"/$inputMarker}"	# %q escapes {}, we don't want that to have it interpolated later.
+			    shift
+			done
+			if [ $# -eq 0 ]; then
+			    echo "ERROR: --fallback-exec command must be concluded with '${SEGREGATEINPUT_EXEC_END}'"; echo; printUsage "$0"
+			    exit 2
+			fi >&2
+			shift
+			addCommandFor '' "$cmd"; shift
+			;;
+	--to-command|-t)
+			shift; submitCommand "${1:?}"; shift; toCommandIndex=$lastUsedIndex;;
+	--to-exec|-T)	shift
+			cmd=
+			printf -v escapedInputMarker %q "$inputMarker"
+			while [ $# -gt 0 -a "$1" != "$SEGREGATEINPUT_EXEC_END" ]
+			do
+			    printf -v quotedArg %q "$1"
+			    cmd+="${cmd:+ }${quotedArg//"$escapedInputMarker"/$inputMarker}"	# %q escapes {}, we don't want that to have it interpolated later.
+			    shift
+			done
+			if [ $# -eq 0 ]; then
+			    echo "ERROR: --to-exec command must be concluded with '${SEGREGATEINPUT_EXEC_END}'"; echo; printUsage "$0"
+			    exit 2
+			fi >&2
+			shift
+			submitCommand "$cmd"
+			toCommandIndex=$lastUsedIndex
+			;;
+	-*)		{ echo "ERROR: Unknown option \"$1\"!"; echo; printUsage "$0"; } >&2; exit 2;;
+	*)		break;;
+    esac
+done
+if [ ${#matchPatterns[@]} -eq 0 ]; then
+    echo 'ERROR: No --regexp, --match, or --no-match passed.'
+    echo
+    printUsage "$0"
+    exit 2
+fi >&2
+
+write()
+{
+    local index="${1?}"; shift
+    [ $index -eq -1 ] && index=$fallbackCommandIndex
+    if [ $index -eq -1 ]; then
+	printf '%s\n' "$@"
+	return
+    fi
+
+    local sinkCommand="${commands[$index]}"
+    local quotedLines; printf -v quotedLines '%q ' "$@"; quotedLines="${quotedLines% }"
+    local interpolatedSinkCommand="${sinkCommand//"$inputMarker"/$quotedLines}"
+    if [ "$interpolatedSinkCommand" = "$sinkCommand" ]; then
+	printf '%s\n' "$@" | eval "$sinkCommand"
+    else
+	eval "$interpolatedSinkCommand"
+    fi || status=$?
+}
+
+status=0
+typeset -a consecutiveLines=()
+previousIndex=-1
+previousContext=
+while IFS=$'\n' read -r line || [ -n "$line" ]
+do
+    index=-1
+    unset context
+    for match in "${matchPatterns[@]}"
+    do
+	isExclude="${matchIsExclude["$match"]}"
+	isIdenticalContext="${matchIsIdenticalContext["$match"]}"
+	isMatch=; [[ "$line" =~ $match ]] && isMatch=t
+	if { [ "$isExclude" ] && [ ! "$isMatch" ]; } \
+	    || { [ ! "$isExclude" ] && [ "$isMatch" ]; }
+	then
+	    index="${matchCommandIndices["$match"]}"
+	    [ "$isIdenticalContext" ] \
+		&& context="${BASH_REMATCH[0]}" \
+		|| unset context
+	    break
+	fi
+    done
+
+    if [ $previousIndex -eq $index ] && [ -z "${context+t}" -o "$previousContext" = "$context" ]; then
+	consecutiveLines+=("$line")
+    else
+	[ ${#consecutiveLines[@]} -eq 0 ] \
+	    || write $previousIndex "${consecutiveLines[@]}"
+	consecutiveLines=("$line")
+	previousIndex=$index
+	previousContext="$context"
+    fi
+done
+if [ ${#consecutiveLines[@]} -gt 0 ]; then
+    write $previousIndex "${consecutiveLines[@]}"
+    consecutiveLines=()
+fi
+exit $status
