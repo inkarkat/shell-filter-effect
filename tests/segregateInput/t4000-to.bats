@@ -160,3 +160,32 @@ EOF
 `----
 EOF
 }
+
+@test "to-command with fallback covers everything not matched" {
+    run -0 segregateInput \
+	--to-command "$QUOTE_COMMAND" \
+	--fallback \
+	--regexp-command '^#' "$UPPERCASE_COMMAND" \
+	--regexp-command '[0-9]' "$FRAGMENT_COMMAND" \
+	< "$INPUT"
+    assert_output - <<'EOF'
+# 0 COMMENT HEADER
+,----
+| 1 first line
+| 2 second line
+`----
+>
+,----
+| 3 third element
+| 4 more
+`----
+>
+# ATTENTION!
+>this is unusual
+>
+,----
+| 98 the end
+`----
+# 99 COMMENT TRAILER
+EOF
+}
