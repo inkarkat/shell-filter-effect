@@ -18,3 +18,8 @@ load fixture
     run -0 segregateInput -h
     refute_line -n 0 -e '^Usage:'
 }
+
+@test "additional argument prints usage instructions" {
+    run -2 segregateInput --regexp-command doesNotMatch "$FRAGMENT_COMMAND" additionalArgument
+    assert_line -n 0 -e '^Usage:'
+}
