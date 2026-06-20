@@ -242,7 +242,7 @@ do
 			addCommandFor "$pattern" "$cmd"
 			;;
 	--fallback)	shift
-			addIndexFor "$pattern" ${toCommandIndex:-$STDOUT_INDEX}
+			addIndexFor '' ${toCommandIndex:-$STDOUT_INDEX}
 			;;
 	--fallback-command|-f)
 			shift
