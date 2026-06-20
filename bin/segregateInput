@@ -135,43 +135,55 @@ submitCommand()
 }
 addCommandFor()
 {
+    local kind="${1:?}"; shift
     local pattern="${1?}"; shift
     local cmd="${1:?}"; shift
     submitCommand "$cmd"
-    addIndexFor "$pattern" $lastUsedIndex
+    addIndexFor "$kind" "$pattern" $lastUsedIndex
 }
-addIndexFor()
-{
-    local pattern="${1?}"; shift
-    local index="${1:?}"; shift
-    [ -n "$pattern" ] \
-	&& matchCommandIndices["$pattern"]=$index \
-	|| fallbackCommandIndex=$index
-}
-
-toCommandIndex=
 typeset -a matchPatterns=()
 typeset -A matchIsExclude=()
 typeset -A matchIsIdenticalContext=()
 typeset -A matchCommandIndices=()
 fallbackCommandIndex=$FALLBACK_INDEX
+addIndexFor()
+{
+    local kind="${1:?}"; shift
+    local pattern="${1?}"; shift
+    local index="${1:?}"; shift
+    if [ -n "$pattern" ]; then
+	matchCommandIndices["$pattern"]=$index
+	matchPatterns+=("$pattern")
+	case "$kind" in
+	    regexp)	;;
+	    match)	matchIsIdenticalContext["$pattern"]=t;;
+	    no-match)	matchIsExclude["$pattern"]=t;;
+	    fallback)	echo >&2 'ERROR: Fallback cannot have a pattern.'; exit 3;;
+	    *)		printf >&2 'ASSERT: Unhandled kind: %s\n' "$kind"; exit 3;;
+	esac
+    else
+	fallbackCommandIndex=$index
+    fi
+}
+
+toCommandIndex=
 while [ $# -ne 0 ]
 do
     case "$1" in
 	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
 
-	--regexp=*)	pattern="${1#--regexp=}"; shift; matchPatterns+=("${pattern:?}")
-			addIndexFor "$pattern" ${toCommandIndex:-$STDOUT_INDEX}
+	--regexp=*)	pattern="${1#--regexp=}"; shift
+			addIndexFor regexp "${pattern:?}" ${toCommandIndex:-$STDOUT_INDEX}
 			;;
-	--regexp)	shift; pattern="${1:?}"; shift; matchPatterns+=("$pattern")
-			addIndexFor "$pattern" ${toCommandIndex:-$STDOUT_INDEX}
+	--regexp)	shift; pattern="${1:?}"; shift
+			addIndexFor regexp "$pattern" ${toCommandIndex:-$STDOUT_INDEX}
 			;;
 	--regexp-command|-e)
-			shift; pattern="${1:?}"; shift; matchPatterns+=("$pattern")
-			addCommandFor "$pattern" "${1:?}"; shift
+			shift; pattern="${1:?}"; shift
+			addCommandFor regexp "$pattern" "${1:?}"; shift
 			;;
 	--regexp-exec|-E)
-			shift; pattern="${1:?}"; shift; matchPatterns+=("$pattern")
+			shift; pattern="${1:?}"; shift
 			cmd=
 			printf -v escapedInputMarker %q "$inputMarker"
 			while [ $# -gt 0 -a "$1" != "$SEGREGATEINPUT_EXEC_END" ]
@@ -185,20 +197,20 @@ do
 			    exit 2
 			fi >&2
 			shift
-			addCommandFor "$pattern" "$cmd"
+			addCommandFor regexp "$pattern" "$cmd"
 			;;
-	--match=*)	pattern="${1#--match=}"; shift; matchPatterns+=("${pattern:?}"); matchIsIdenticalContext["$pattern"]=t
-			addIndexFor "$pattern" ${toCommandIndex:-$STDOUT_INDEX}
+	--match=*)	pattern="${1#--match=}"; shift
+			addIndexFor match "${pattern:?}" ${toCommandIndex:-$STDOUT_INDEX}
 			;;
-	--match)	shift; pattern="${1:?}"; shift; matchPatterns+=("$pattern"); matchIsIdenticalContext["$pattern"]=t
-			addIndexFor "$pattern" ${toCommandIndex:-$STDOUT_INDEX}
+	--match)	shift; pattern="${1:?}"; shift
+			addIndexFor match "$pattern" ${toCommandIndex:-$STDOUT_INDEX}
 			;;
 	--match-command|-m)
-			shift; pattern="${1:?}"; shift; matchPatterns+=("$pattern"); matchIsIdenticalContext["$pattern"]=t
-			addCommandFor "$pattern" "${1:?}"; shift
+			shift; pattern="${1:?}"; shift
+			addCommandFor match "$pattern" "${1:?}"; shift
 			;;
 	--match-exec|-M)
-			shift; pattern="${1:?}"; shift; matchPatterns+=("$pattern"); matchIsIdenticalContext["$pattern"]=t
+			shift; pattern="${1:?}"; shift
 			cmd=
 			printf -v escapedInputMarker %q "$inputMarker"
 			while [ $# -gt 0 -a "$1" != "$SEGREGATEINPUT_EXEC_END" ]
@@ -212,20 +224,20 @@ do
 			    exit 2
 			fi >&2
 			shift
-			addCommandFor "$pattern" "$cmd"
+			addCommandFor match "$pattern" "$cmd"
 			;;
-	--no-match=*)	pattern="${1#--no-match=}"; shift; matchPatterns+=("${pattern:?}"); matchIsExclude["$pattern"]=t
-			addIndexFor "$pattern" ${toCommandIndex:-$STDOUT_INDEX}
+	--no-match=*)	pattern="${1#--no-match=}"; shift
+			addIndexFor no-match "${pattern:?}" ${toCommandIndex:-$STDOUT_INDEX}
 			;;
-	--no-match)	shift; pattern="${1:?}"; shift; matchPatterns+=("$pattern"); matchIsExclude["$pattern"]=t
-			addIndexFor "$pattern" ${toCommandIndex:-$STDOUT_INDEX}
+	--no-match)	shift; pattern="${1:?}"; shift
+			addIndexFor no-match "$pattern" ${toCommandIndex:-$STDOUT_INDEX}
 			;;
 	--no-match-command|-v)
-			shift; pattern="${1:?}"; shift; matchPatterns+=("$pattern"); matchIsExclude["$pattern"]=t
-			addCommandFor "$pattern" "${1:?}"; shift
+			shift; pattern="${1:?}"; shift
+			addCommandFor no-match "$pattern" "${1:?}"; shift
 			;;
 	--no-match-exec|-V)
-			shift; pattern="${1:?}"; shift; matchPatterns+=("$pattern"); matchIsExclude["$pattern"]=t
+			shift; pattern="${1:?}"; shift
 			cmd=
 			printf -v escapedInputMarker %q "$inputMarker"
 			while [ $# -gt 0 -a "$1" != "$SEGREGATEINPUT_EXEC_END" ]
@@ -239,14 +251,14 @@ do
 			    exit 2
 			fi >&2
 			shift
-			addCommandFor "$pattern" "$cmd"
+			addCommandFor no-match "$pattern" "$cmd"
 			;;
 	--fallback)	shift
-			addIndexFor '' ${toCommandIndex:-$STDOUT_INDEX}
+			addIndexFor fallback '' ${toCommandIndex:-$STDOUT_INDEX}
 			;;
 	--fallback-command|-f)
 			shift
-			addCommandFor '' "${1:?}"; shift
+			addCommandFor fallback '' "${1:?}"; shift
 			;;
 	--fallback-exec|-F)
 			shift
@@ -263,7 +275,7 @@ do
 			    exit 2
 			fi >&2
 			shift
-			addCommandFor '' "$cmd"
+			addCommandFor fallback '' "$cmd"
 			;;
 	--to-command|-t)
 			shift; submitCommand "${1:?}"; shift; toCommandIndex=$lastUsedIndex;;
