@@ -118,3 +118,21 @@ this is unusual
 # 99 comment trailer
 EOF
 }
+
+@test "match-exec counting lines take precedence over equivalent following pattern" {
+    run -0 segregateInput --regexp-exec '^[0-9]' "${COUNT_COMMAND[@]}" \; --regexp-command '^[0123456789]' "$QUOTE_COMMAND" < "$INPUT"
+    assert_output - <<'EOF'
+# 0 comment header
+1
+2
+
+1
+2
+
+# attention!
+this is unusual
+
+1
+# 99 comment trailer
+EOF
+}

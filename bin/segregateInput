@@ -185,7 +185,7 @@ do
 			    exit 2
 			fi >&2
 			shift
-			addCommandFor "$pattern" "$cmd"; shift
+			addCommandFor "$pattern" "$cmd"
 			;;
 	--match=*)	pattern="${1#--match=}"; shift; matchPatterns+=("${pattern:?}"); matchIsIdenticalContext["$pattern"]=t
 			addIndexFor "$pattern" ${toCommandIndex:-$STDOUT_INDEX}
@@ -212,7 +212,7 @@ do
 			    exit 2
 			fi >&2
 			shift
-			addCommandFor "$pattern" "$cmd"; shift
+			addCommandFor "$pattern" "$cmd"
 			;;
 	--no-match=*)	pattern="${1#--no-match=}"; shift; matchPatterns+=("${pattern:?}"); matchIsExclude["$pattern"]=t
 			addIndexFor "$pattern" ${toCommandIndex:-$STDOUT_INDEX}
@@ -239,7 +239,7 @@ do
 			    exit 2
 			fi >&2
 			shift
-			addCommandFor "$pattern" "$cmd"; shift
+			addCommandFor "$pattern" "$cmd"
 			;;
 	--fallback)	shift
 			addIndexFor "$pattern" ${toCommandIndex:-$STDOUT_INDEX}

@@ -67,3 +67,21 @@ EOF
 2
 EOF
 }
+
+@test "counting everything but empty lines take precedence over equivalent following pattern" {
+    run -0 segregateInput --no-match-exec '^$' "${COUNT_COMMAND[@]}" \; --no-match-command '^x?$' "$QUOTE_COMMAND" < "$INPUT"
+    assert_output - <<'EOF'
+1
+2
+3
+
+1
+2
+
+1
+2
+
+1
+2
+EOF
+}
