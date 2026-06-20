@@ -127,3 +127,36 @@ EOF
 `----
 EOF
 }
+
+@test "combination of individual matches, patttern, and no-match patterns with separate to-command processes lines together " {
+    run -0 segregateInput \
+	--to-command "$FRAGMENT_COMMAND" \
+	--regexp '^#' \
+	--match '9|[a-z]{4}$' \
+	--no-match '^$' \
+	< "$INPUT"
+    assert_output - <<'EOF'
+,----
+| # 0 comment header
+| 1 first line
+| 2 second line
+`----
+
+,----
+| 3 third element
+`----
+,----
+| 4 more
+`----
+
+,----
+| # attention!
+| this is unusual
+`----
+
+,----
+| 98 the end
+| # 99 comment trailer
+`----
+EOF
+}

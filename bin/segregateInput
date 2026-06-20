@@ -312,7 +312,7 @@ write()
 status=0
 typeset -a consecutiveLines=()
 previousIndex=-1
-previousContext=
+unset previousContext
 while IFS=$'\n' read -r line || [ -n "$line" ]
 do
     index=-1
@@ -333,14 +333,16 @@ do
 	fi
     done
 
-    if [ $previousIndex -eq $index ] && [ -z "${context+t}" -o "$previousContext" = "$context" ]; then
+    if [ $previousIndex -eq $index ] && [ -z "${context+t}" -o -z "${previousContext+t}" -o "$previousContext" = "$context" ]; then
 	consecutiveLines+=("$line")
     else
 	[ ${#consecutiveLines[@]} -eq 0 ] \
 	    || write $previousIndex "${consecutiveLines[@]}"
 	consecutiveLines=("$line")
 	previousIndex=$index
-	previousContext="$context"
+	[ -n "${context+t}" ] \
+	    && previousContext="$context" \
+	    || unset previousContext
     fi
 done
 if [ ${#consecutiveLines[@]} -gt 0 ]; then
