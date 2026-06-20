@@ -123,7 +123,9 @@ SEE ALSO:
 HELPTEXT
 }
 
-let lastUsedIndex=-1
+readonly FALLBACK_INDEX=-1
+readonly STDOUT_INDEX=-2
+let lastUsedIndex=$FALLBACK_INDEX
 typeset -a commands=()
 submitCommand()
 {
@@ -152,17 +154,17 @@ typeset -a matchPatterns=()
 typeset -A matchIsExclude=()
 typeset -A matchIsIdenticalContext=()
 typeset -A matchCommandIndices=()
-fallbackCommandIndex=-1
+fallbackCommandIndex=$FALLBACK_INDEX
 while [ $# -ne 0 ]
 do
     case "$1" in
 	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
 
 	--regexp=*)	pattern="${1#--regexp=}"; shift; matchPatterns+=("${pattern:?}")
-			[ -z "$toCommandIndex" ] || addIndexFor "$pattern" $toCommandIndex
+			addIndexFor "$pattern" ${toCommandIndex:-$STDOUT_INDEX}
 			;;
 	--regexp)	shift; pattern="${1:?}"; shift; matchPatterns+=("$pattern")
-			[ -z "$toCommandIndex" ] || addIndexFor "$pattern" $toCommandIndex
+			addIndexFor "$pattern" ${toCommandIndex:-$STDOUT_INDEX}
 			;;
 	--regexp-command|-e)
 			shift; pattern="${1:?}"; shift; matchPatterns+=("$pattern")
@@ -186,10 +188,10 @@ do
 			addCommandFor "$pattern" "$cmd"; shift
 			;;
 	--match=*)	pattern="${1#--match=}"; shift; matchPatterns+=("${pattern:?}"); matchIsIdenticalContext["$pattern"]=t
-			[ -z "$toCommandIndex" ] || addIndexFor "$pattern" $toCommandIndex
+			addIndexFor "$pattern" ${toCommandIndex:-$STDOUT_INDEX}
 			;;
 	--match)	shift; pattern="${1:?}"; shift; matchPatterns+=("$pattern"); matchIsIdenticalContext["$pattern"]=t
-			[ -z "$toCommandIndex" ] || addIndexFor "$pattern" $toCommandIndex
+			addIndexFor "$pattern" ${toCommandIndex:-$STDOUT_INDEX}
 			;;
 	--match-command|-m)
 			shift; pattern="${1:?}"; shift; matchPatterns+=("$pattern"); matchIsIdenticalContext["$pattern"]=t
@@ -213,10 +215,10 @@ do
 			addCommandFor "$pattern" "$cmd"; shift
 			;;
 	--no-match=*)	pattern="${1#--no-match=}"; shift; matchPatterns+=("${pattern:?}"); matchIsExclude["$pattern"]=t
-			[ -z "$toCommandIndex" ] || addIndexFor "$pattern" $toCommandIndex
+			addIndexFor "$pattern" ${toCommandIndex:-$STDOUT_INDEX}
 			;;
 	--no-match)	shift; pattern="${1:?}"; shift; matchPatterns+=("$pattern"); matchIsExclude["$pattern"]=t
-			[ -z "$toCommandIndex" ] || addIndexFor "$pattern" $toCommandIndex
+			addIndexFor "$pattern" ${toCommandIndex:-$STDOUT_INDEX}
 			;;
 	--no-match-command|-v)
 			shift; pattern="${1:?}"; shift; matchPatterns+=("$pattern"); matchIsExclude["$pattern"]=t
@@ -240,7 +242,7 @@ do
 			addCommandFor "$pattern" "$cmd"; shift
 			;;
 	--fallback)	shift
-			[ -z "$toCommandIndex" ] || addIndexFor '' $toCommandIndex
+			addIndexFor "$pattern" ${toCommandIndex:-$STDOUT_INDEX}
 			;;
 	--fallback-command|-f)
 			shift
@@ -298,9 +300,9 @@ fi >&2
 
 write()
 {
-    local index="${1?}"; shift
-    [ $index -eq -1 ] && index=$fallbackCommandIndex
-    if [ $index -eq -1 ]; then
+    local index="${1:?}"; shift
+    [ $index -eq $FALLBACK_INDEX ] && index=$fallbackCommandIndex
+    if [ $index -lt 0 ]; then
 	printf '%s\n' "$@"
 	return
     fi
@@ -317,11 +319,11 @@ write()
 
 status=0
 typeset -a consecutiveLines=()
-previousIndex=-1
+previousIndex=$FALLBACK_INDEX
 unset previousContext
 while IFS=$'\n' read -r line || [ -n "$line" ]
 do
-    index=-1
+    index=$FALLBACK_INDEX
     unset context
     for match in "${matchPatterns[@]}"
     do
@@ -343,7 +345,7 @@ do
 	consecutiveLines+=("$line")
     else
 	[ ${#consecutiveLines[@]} -eq 0 ] \
-	    || write $previousIndex "${consecutiveLines[@]}"
+	    || write "$previousIndex" "${consecutiveLines[@]}"
 	consecutiveLines=("$line")
 	previousIndex=$index
 	[ -n "${context+t}" ] \
@@ -352,7 +354,7 @@ do
     fi
 done
 if [ ${#consecutiveLines[@]} -gt 0 ]; then
-    write $previousIndex "${consecutiveLines[@]}"
+    write "$previousIndex" "${consecutiveLines[@]}"
     consecutiveLines=()
 fi
 exit $status

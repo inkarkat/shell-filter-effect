@@ -57,3 +57,31 @@ EOF
 # 99 COMMENT TRAILER
 EOF
 }
+
+@test "--regexp overrides fallback and prints to stdout" {
+    run -0 segregateInput \
+	--fallback-command "$QUOTE_COMMAND" \
+	--regexp '^#' \
+	--regexp-command '[0-9]' "$FRAGMENT_COMMAND" \
+	< "$INPUT"
+    assert_output - <<'EOF'
+# 0 comment header
+,----
+| 1 first line
+| 2 second line
+`----
+>
+,----
+| 3 third element
+| 4 more
+`----
+>
+# attention!
+>this is unusual
+>
+,----
+| 98 the end
+`----
+# 99 comment trailer
+EOF
+}
